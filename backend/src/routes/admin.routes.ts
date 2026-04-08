@@ -59,7 +59,7 @@ router.patch('/users/:id/role', async (req, res) => {
   res.json({ success: true, data: user });
 });
 
-// ─── [MỚI] Chi tiết user ──────────────────────────────────
+// ─── Chi tiết user ──────────────────────────────────
 router.get('/users/:id/detail', async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
@@ -98,7 +98,7 @@ router.get('/users/:id/detail', async (req, res) => {
   }
 });
 
-// ─── [MỚI] Khoá / mở tài khoản ───────────────────────────
+// ─── Khoá / mở tài khoản ───────────────────────────
 router.patch('/users/:id/status', async (req, res) => {
   try {
     const user = await User.findById(req.params.id);

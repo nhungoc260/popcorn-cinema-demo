@@ -66,7 +66,11 @@ export default function TheatersPage() {
   const byMovie: Record<string, { movie: any; times: any[] }> = {}
   showtimes
     .filter(st => !selectedRoomId || st.room?._id === selectedRoomId)
-    .filter(st => st.movie?.status !== 'ended' && st.movie?.status !== 'suspended') // ẩn phim đã kết thúc hoặc ngưng chiếu
+    .filter(st => st.movie?.status !== 'ended' && st.movie?.status !== 'suspended')
+    .filter(st => {
+      const endMs = st.endTime ? new Date(st.endTime).getTime() : new Date(st.startTime).getTime() + (st.movie?.duration || 120) * 60 * 1000
+      return endMs >= Date.now()
+    })
     .forEach(st => {
       const mid = st.movie?._id
       if (!mid) return

@@ -100,7 +100,14 @@ export default function ShowtimesPage() {
       if (!g[mid]) g[mid] = { movie: st.movie, showtimes: [] }
       g[mid].showtimes.push(st)
     })
-    return Object.values(g)
+    return Object.values(g).filter(({ showtimes }) =>
+      showtimes.some(st => {
+        const endMs = st.endTime
+          ? new Date(st.endTime).getTime()
+          : new Date(st.startTime).getTime() + (st.movie?.duration || 120) * 60 * 1000
+        return endMs >= Date.now()
+      })
+    )
   }, [allShowtimes, selectedMovieId, selectedTheaterId, cityFilter, search, selectedRoomId])
 
   const handleBooking = (showtimeId: string) => {

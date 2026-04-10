@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation } from '@tanstack/react-query'
@@ -51,6 +51,19 @@ export default function PaymentPage() {
     select: d => d.data.data,
   })
 
+  const booking = bookingData as any
+  const loyalty = loyaltyData as any
+  const currentMethod = METHODS.find(m => m.id === method)!
+  const finalAmount = discount ? discount.finalAmount : booking?.totalAmount
+
+  // ✅ Tính số điểm tối đa có thể dùng (30% giá trị đơn)
+  const maxPointsAllowed = useMemo(() => {
+    if (!booking?.totalAmount || !loyalty?.points) return 0
+    const maxDiscount = Math.floor(booking.totalAmount * 0.3)
+    const maxByPercent = Math.floor(maxDiscount / 10000 * 100)
+    return Math.min(maxByPercent, loyalty.points)
+  }, [booking?.totalAmount, loyalty?.points])
+
   useEffect(() => {
     if (step === 'waiting' && txnId) {
       pollRef.current = setInterval(async () => {
@@ -90,6 +103,9 @@ export default function PaymentPage() {
     if (!val) {
       setDiscount(null)
       setPointsToUse(0)
+    } else {
+      // ✅ Tự điền sẵn số điểm tối đa có thể dùng
+      setPointsToUse(maxPointsAllowed)
     }
   }
 
@@ -119,10 +135,11 @@ export default function PaymentPage() {
     onError: () => toast.error('Lỗi xác nhận'),
   })
 
-  const booking = bookingData as any
-  const loyalty = loyaltyData as any
-  const currentMethod = METHODS.find(m => m.id === method)!
-  const finalAmount = discount ? discount.finalAmount : booking?.totalAmount
+  const { mutate: cancelBooking, isPending: cancelling } = useMutation({
+    mutationFn: () => bookingApi.cancel(bookingId!),
+    onSuccess: () => navigate(-1),
+    onError: () => navigate(-1),
+  })
 
   return (
     <div className="min-h-screen pt-24 pb-12 px-4" style={{ background: 'var(--color-bg)' }}>
@@ -189,8 +206,7 @@ export default function PaymentPage() {
                           value={pointsToUse}
                           onChange={e => setPointsToUse(Math.min(+e.target.value, loyalty.points))}
                           className="flex-1 px-3 py-2 rounded-xl text-sm"
-                          style={{ background: 'var(--color-bg)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text)' }}
-                          placeholder={`Nhập số điểm (tối đa ${loyalty.points})`}
+                          style={{ background: 'var(--color-bg)', border: `1px solid ${pointsToUse > maxPointsAllowed ? '#F97316' : 'var(--color-glass-border)'}`, color: 'var(--color-text)' }}
                         />
                         <button
                           onClick={handleApplyPoints}
@@ -200,9 +216,21 @@ export default function PaymentPage() {
                           {loadingDiscount ? '...' : 'Áp dụng'}
                         </button>
                       </div>
-                      <p className="text-xs" style={{ color: 'var(--color-text-dim)' }}>
+
+                      {/* ✅ Thông báo rõ ràng số điểm tối đa */}
+                      <div className="text-xs" style={{ color: 'var(--color-text-dim)' }}>
                         100 điểm = 10.000đ · Tối đa 30% giá trị đơn
-                      </p>
+                      </div>
+                      <div className="text-xs px-2 py-1.5 rounded-lg"
+                        style={{ background: 'rgba(253,230,138,0.08)', color: '#FDE68A', border: '1px solid rgba(253,230,138,0.15)' }}>
+                        💡 Đơn này chỉ áp dụng được tối đa <b>{maxPointsAllowed} điểm</b> (giảm {fmtPrice(Math.floor(maxPointsAllowed / 100 * 10000))})
+                      </div>
+                      {pointsToUse > maxPointsAllowed && (
+                        <div className="text-xs px-2 py-1.5 rounded-lg"
+                          style={{ background: 'rgba(249,115,22,0.08)', color: '#F97316', border: '1px solid rgba(249,115,22,0.2)' }}>
+                          ⚠️ Bạn nhập {pointsToUse} điểm nhưng chỉ được dùng tối đa {maxPointsAllowed} điểm
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -275,18 +303,13 @@ export default function PaymentPage() {
                   </div>
                 )}
 
-                {/* 2 nút cạnh nhau */}
                 <div className="flex gap-3">
                   <button
-                    onClick={async () => {
-                      try {
-                        await bookingApi.cancel(bookingId!)
-                      } catch {}
-                      navigate(-1)
-                    }}
+                    onClick={() => cancelBooking()}
+                    disabled={cancelling}
                     className="flex-1 py-4 rounded-2xl text-sm font-medium"
                     style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text-muted)' }}>
-                    ← Chọn ghế khác
+                    {cancelling ? '⏳ Đang hủy...' : '← Chọn ghế khác'}
                   </button>
 
                   <motion.button onClick={() => { if (!initiating) initiate() }}

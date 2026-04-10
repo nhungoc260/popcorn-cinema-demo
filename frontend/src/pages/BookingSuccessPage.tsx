@@ -109,14 +109,23 @@ export default function BookingSuccessPage() {
             {b?.status === 'confirmed' || b?.status === 'checked_in' ? 'Đặt Vé Thành Công! 🎬' :
              b?.status === 'pending' ? 'Chờ Thanh Toán ⏳' :
              b?.status === 'pending_payment' ? 'Chờ Xác Nhận 🔄' :
-             b?.status === 'cancelled' ? 'Vé Đã Hủy ❌' : 'Chi Tiết Vé 🎫'}
+             b?.status === 'cancelled' ? 'Vé Đã Hủy ❌' :
+             b?.status === 'refunded' ? 'Vé Đã Hoàn Tiền 💸' : 'Chi Tiết Vé 🎫'}
           </h1>
           <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
             {b?.status === 'confirmed' || b?.status === 'checked_in' ? 'Vé của bạn đã được xác nhận. Chúc xem phim vui!' :
              b?.status === 'pending' ? 'Vé chưa được thanh toán.' :
              b?.status === 'pending_payment' ? 'Đang chờ admin/nhân viên xác nhận chuyển khoản.' :
-             b?.status === 'cancelled' ? 'Vé này đã bị hủy.' : ''}
+             b?.status === 'cancelled' ? 'Vé này đã bị hủy.' :
+             b?.status === 'refunded' ? 'Vé đã được hoàn tiền và không còn hiệu lực.' : ''}
           </p>
+          {/* Banner cảnh báo cho vé không hợp lệ */}
+          {(b?.status === 'cancelled' || b?.status === 'refunded') && (
+            <div className="mt-3 px-4 py-2 rounded-xl text-xs font-medium"
+              style={{ background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.3)', color: '#f43f5e' }}>
+              ⚠️ Vé này không thể sử dụng để vào rạp
+            </div>
+          )}
         </motion.div>
 
         {/* Ticket */}
@@ -170,8 +179,8 @@ export default function BookingSuccessPage() {
                 </div>
               </div>
 
-              {/* QR Code section */}
-              {b.qrCode && (
+              {/* QR Code section — CHỈ hiện khi vé đã xác nhận */}
+              {b.qrCode && (b.status === 'confirmed' || b.status === 'checked_in') && (
                 <>
                   <div className="relative py-3 px-6 flex items-center">
                     <div className="flex-1 border-dashed border-t" style={{ borderColor: 'var(--color-glass-border)' }} />

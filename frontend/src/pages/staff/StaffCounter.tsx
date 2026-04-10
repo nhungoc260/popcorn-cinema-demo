@@ -221,7 +221,12 @@ export default function StaffCounter() {
       // Delay nhỏ để socket emit kịp xử lý
       await new Promise(r => setTimeout(r, 200))
 
-      const bookRes = await bookingApi.create(selShowtime._id, selSeats.map(s => s._id), customerResult?._id || undefined, true)
+      const bookRes = await api.post('/bookings', {
+        showtimeId: selShowtime._id,
+        seatIds: selSeats.map(s => s._id),
+        customerId: customerResult?._id || undefined,
+        isCounterSale: true,
+      })
       const b = bookRes.data.data
       const initRes = await paymentApi.initiate(b._id, payMethod)
       const txn = initRes.data.data.transactionId
@@ -1311,11 +1316,16 @@ export default function StaffCounter() {
 
 // ── Invoices Tab Component ──
 function InvoicesTab() {
+  const qc = useQueryClient()
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [selected, setSelected] = useState<any>(null)
+  const [refundReason, setRefundReason] = useState('')
+  const [showRefundForm, setShowRefundForm] = useState(false)
+  const [showRequestForm, setShowRequestForm] = useState(false)
+  const [requestReason, setRequestReason] = useState('')
 
   const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
     success:              { label: 'Thành công',    color: '#34d399', bg: 'rgba(52,211,153,0.1)'  },
@@ -1323,10 +1333,40 @@ function InvoicesTab() {
     pending_confirmation: { label: 'Chờ xác nhận',  color: '#f97316', bg: 'rgba(249,115,22,0.1)'  },
     customer_confirmed:   { label: 'KH xác nhận',   color: '#60a5fa', bg: 'rgba(96,165,250,0.1)'  },
     failed:               { label: 'Thất bại',       color: '#f43f5e', bg: 'rgba(244,63,94,0.1)'   },
+    refunded:             { label: 'Đã hoàn tiền',   color: '#a78bfa', bg: 'rgba(167,139,250,0.1)' },
   }
   const METHOD_CFG: Record<string, { label: string; icon: string }> = {
     cash: { label: 'Tiền mặt', icon: '💵' }, bank: { label: 'CK', icon: '💳' },
     vietqr: { label: 'VietQR', icon: '🏦' }, momo: { label: 'MoMo', icon: '📱' },
+  }
+
+  const { mutate: doRefund, isPending: refunding } = useMutation({
+    mutationFn: () => api.post(`/bookings/${selected?.booking?._id}/refund`, { reason: refundReason }),
+    onSuccess: (res) => {
+      toast.success(res.data.message || '✅ Hoàn vé thành công!')
+      setSelected(null); setShowRefundForm(false); setRefundReason('')
+      qc.invalidateQueries({ queryKey: ['staff-invoices'] })
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Không thể hoàn vé'),
+  })
+
+  const { mutate: doRequestRefund, isPending: requesting } = useMutation({
+    mutationFn: () => api.post(`/bookings/${selected?.booking?._id}/request-refund`, { reason: requestReason }),
+    onSuccess: (res) => {
+      toast.success(res.data.message || '📋 Đã gửi yêu cầu lên Admin!')
+      setSelected(null); setShowRequestForm(false); setRequestReason('')
+      qc.invalidateQueries({ queryKey: ['staff-invoices'] })
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Không thể gửi yêu cầu'),
+  })
+
+  const canRefund = (inv: any) => {
+    if (inv?.status !== 'success') return false
+    if (inv?.booking?.status === 'checked_in' || inv?.booking?.status === 'cancelled') return false
+    if ((inv?.amount || 0) > 500000) return false
+    const startTime = inv?.booking?.showtime?.startTime
+    if (!startTime) return false
+    return (new Date(startTime).getTime() - Date.now()) / (1000 * 60 * 60) >= 2
   }
 
   const { data, isLoading } = useQuery({
@@ -1449,6 +1489,117 @@ function InvoicesTab() {
                   <span className="text-xs font-medium" style={{ color: 'var(--color-text)' }}>{value}</span>
                 </div>
               ))}
+
+              {/* Hoàn tiền */}
+              {canRefund(selected) && !showRefundForm && (
+                <button onClick={() => setShowRefundForm(true)}
+                  className="w-full mt-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.3)' }}>
+                  💸 Hoàn tiền cho khách
+                </button>
+              )}
+
+              {/* Form nhập lý do hoàn */}
+              {showRefundForm && (
+                <div className="mt-2 p-3 rounded-xl space-y-2" style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)' }}>
+                  <p className="text-xs font-semibold" style={{ color: '#a78bfa' }}>💸 Xác nhận hoàn tiền</p>
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                    Số tiền hoàn: <strong style={{ color: '#fde68a' }}>{selected.amount?.toLocaleString('vi-VN')}đ</strong>
+                  </p>
+
+                  {/* Lý do nhanh */}
+                  <div className="flex gap-1.5 flex-wrap">
+                    {['Khách bệnh đột xuất', 'Sự cố gia đình', 'Lỗi đặt nhầm suất', 'Lý do khác'].map(r => (
+                      <button key={r} onClick={() => setRefundReason(r)}
+                        className="px-2 py-1 rounded-lg text-xs transition-all"
+                        style={{
+                          background: refundReason === r ? 'rgba(167,139,250,0.25)' : 'var(--color-bg-3)',
+                          color: refundReason === r ? '#a78bfa' : 'var(--color-text-muted)',
+                          border: `1px solid ${refundReason === r ? 'rgba(167,139,250,0.4)' : 'var(--color-glass-border)'}`,
+                        }}>
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+
+                  <textarea value={refundReason} onChange={e => setRefundReason(e.target.value)}
+                    placeholder="Nhập lý do hoàn tiền (bắt buộc)..."
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-lg text-xs outline-none resize-none"
+                    style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text)' }} />
+
+                  <div className="flex gap-2">
+                    <button onClick={() => { setShowRefundForm(false); setRefundReason('') }}
+                      className="flex-1 py-2 rounded-lg text-xs"
+                      style={{ background: 'var(--color-bg-3)', color: 'var(--color-text-muted)', border: '1px solid var(--color-glass-border)' }}>
+                      Huỷ
+                    </button>
+                    <button onClick={() => doRefund()} disabled={refunding || refundReason.trim().length < 5}
+                      className="flex-1 py-2 rounded-lg text-xs font-semibold disabled:opacity-40 transition-all"
+                      style={{ background: 'rgba(167,139,250,0.2)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.4)' }}>
+                      {refunding ? 'Đang xử lý...' : '✓ Xác nhận hoàn'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Thông báo nếu không đủ điều kiện hoàn */}
+              {selected.status === 'success' && !canRefund(selected) && selected.booking?.status !== 'cancelled' && (
+                <div className="mt-2 space-y-2">
+                  <div className="px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(251,191,36,0.08)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
+                    ⚠️ {(selected.amount || 0) > 500000
+                      ? 'Vé trên 500.000đ — cần Admin duyệt'
+                      : 'Suất chiếu trong vòng 2 tiếng hoặc đã kết thúc — cần Admin duyệt'}
+                  </div>
+
+                  {/* Đã có yêu cầu pending */}
+                  {selected.metadata?.refundRequest?.status === 'pending' ? (
+                    <div className="px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(167,139,250,0.08)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.2)' }}>
+                      📋 Đã gửi yêu cầu hoàn tiền — đang chờ Admin duyệt
+                    </div>
+                  ) : !showRequestForm ? (
+                    <button onClick={() => setShowRequestForm(true)}
+                      className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all"
+                      style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>
+                      📋 Gửi yêu cầu hoàn tiền lên Admin
+                    </button>
+                  ) : (
+                    <div className="p-3 rounded-xl space-y-2" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                      <p className="text-xs font-semibold" style={{ color: '#fbbf24' }}>📋 Yêu cầu hoàn tiền</p>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {['Khách bệnh đột xuất', 'Sự cố gia đình', 'Lỗi đặt nhầm', 'Khách yêu cầu đặc biệt'].map(r => (
+                          <button key={r} onClick={() => setRequestReason(r)}
+                            className="px-2 py-1 rounded-lg text-xs transition-all"
+                            style={{
+                              background: requestReason === r ? 'rgba(251,191,36,0.2)' : 'var(--color-bg-3)',
+                              color: requestReason === r ? '#fbbf24' : 'var(--color-text-muted)',
+                              border: `1px solid ${requestReason === r ? 'rgba(251,191,36,0.4)' : 'var(--color-glass-border)'}`,
+                            }}>
+                            {r}
+                          </button>
+                        ))}
+                      </div>
+                      <textarea value={requestReason} onChange={e => setRequestReason(e.target.value)}
+                        placeholder="Mô tả lý do cần hoàn tiền..."
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-lg text-xs outline-none resize-none"
+                        style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text)' }} />
+                      <div className="flex gap-2">
+                        <button onClick={() => { setShowRequestForm(false); setRequestReason('') }}
+                          className="flex-1 py-2 rounded-lg text-xs"
+                          style={{ background: 'var(--color-bg-3)', color: 'var(--color-text-muted)', border: '1px solid var(--color-glass-border)' }}>
+                          Huỷ
+                        </button>
+                        <button onClick={() => doRequestRefund()} disabled={requesting || requestReason.trim().length < 5}
+                          className="flex-1 py-2 rounded-lg text-xs font-semibold disabled:opacity-40"
+                          style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>
+                          {requesting ? 'Đang gửi...' : '✓ Gửi yêu cầu'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </motion.div>
         </div>

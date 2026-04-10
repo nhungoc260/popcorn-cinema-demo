@@ -358,6 +358,151 @@ export async function checkIn(req: AuthRequest, res: Response) {
   }
 }
 
+// POST /bookings/:id/request-refund — Staff tạo yêu cầu hoàn tiền gửi Admin duyệt
+export async function requestRefund(req: AuthRequest, res: Response) {
+  try {
+    const { reason } = req.body
+    if (!reason || reason.trim().length < 5) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập lý do (tối thiểu 5 ký tự)' })
+    }
+
+    const booking = await Booking.findById(req.params.id)
+    if (!booking) return res.status(404).json({ success: false, message: 'Không tìm thấy booking' })
+
+    if (booking.status !== 'confirmed') {
+      const msg: Record<string, string> = {
+        pending: 'Vé chưa thanh toán', pending_payment: 'Vé chưa thanh toán',
+        cancelled: 'Vé đã bị hủy', checked_in: 'Vé đã check-in',
+      }
+      return res.status(400).json({ success: false, message: msg[booking.status] || 'Vé không hợp lệ' })
+    }
+
+    const { Payment } = await import('../models')
+    const payment = await Payment.findOne({ booking: booking._id, status: 'success' })
+    if (!payment) return res.status(404).json({ success: false, message: 'Không tìm thấy giao dịch' })
+
+    // Kiểm tra đã có yêu cầu chưa
+    if ((payment.metadata as any)?.refundRequest?.status === 'pending') {
+      return res.status(400).json({ success: false, message: 'Đã có yêu cầu hoàn tiền đang chờ duyệt' })
+    }
+
+    // Ghi yêu cầu vào metadata
+    const staffUser = await (await import('../models')).User.findById(req.user!.id).select('name').lean() as any
+    payment.metadata = {
+      ...(payment.metadata || {}),
+      refundRequest: {
+        status: 'pending',
+        reason: reason.trim(),
+        requestedBy: req.user!.id,
+        requestedByName: staffUser?.name || 'Staff',
+        requestedAt: new Date(),
+      }
+    }
+    await payment.save()
+
+    return res.json({ success: true, message: '📋 Đã gửi yêu cầu hoàn tiền lên Admin!' })
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message })
+  }
+}
+
+// POST /bookings/:id/refund  — Staff hoàn tiền có điều kiện
+// Điều kiện: chưa check-in, còn ≥ 2 tiếng trước suất chiếu, ≤ 500.000đ/lần, bắt buộc có lý do
+export async function staffRefund(req: AuthRequest, res: Response) {
+  try {
+    const { reason } = req.body
+    if (!reason || reason.trim().length < 5) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập lý do hoàn tiền (tối thiểu 5 ký tự)' })
+    }
+
+    const booking = await Booking.findById(req.params.id)
+      .populate({ path: 'showtime', populate: [{ path: 'movie', select: 'title' }] })
+      .populate('user', 'name email')
+    if (!booking) return res.status(404).json({ success: false, message: 'Không tìm thấy booking' })
+
+    // Chỉ hoàn vé đã confirmed (đã thanh toán), chưa check-in
+    if (!['confirmed'].includes(booking.status)) {
+      const msg: Record<string, string> = {
+        pending: 'Vé chưa thanh toán',
+        pending_payment: 'Vé chưa thanh toán',
+        cancelled: 'Vé đã bị hủy',
+        checked_in: 'Vé đã check-in, không thể hoàn',
+      }
+      return res.status(400).json({ success: false, message: msg[booking.status] || 'Vé không đủ điều kiện hoàn' })
+    }
+
+    // Kiểm tra còn ≥ 2 tiếng trước suất chiếu
+    const showtime = booking.showtime as any
+    const startTime = new Date(showtime.startTime).getTime()
+    const now = Date.now()
+    const hoursLeft = (startTime - now) / (1000 * 60 * 60)
+    if (hoursLeft < 2) {
+      return res.status(400).json({
+        success: false,
+        message: `Chỉ hoàn được vé trước suất chiếu ít nhất 2 tiếng. Suất chiếu bắt đầu lúc ${new Date(showtime.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
+      })
+    }
+
+    // Giới hạn số tiền hoàn tối đa 500.000đ/lần
+    const refundAmount = booking.paidAmount || booking.totalAmount
+    if (refundAmount > 500000) {
+      return res.status(400).json({
+        success: false,
+        message: `Vé có giá trị ${refundAmount.toLocaleString('vi-VN')}đ vượt quá hạn mức hoàn tiền của nhân viên (500.000đ). Vui lòng liên hệ Admin.`
+      })
+    }
+
+    // Giới hạn nhân viên này hoàn tối đa 3 vé hôm nay
+    const { Payment } = await import('../models')
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+    const refundedToday = await Payment.countDocuments({
+      soldBy: req.user!.id,
+      status: 'refunded',
+      updatedAt: { $gte: todayStart },
+    })
+    if (refundedToday >= 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bạn đã hoàn tối đa 3 vé hôm nay. Vui lòng liên hệ Admin để xử lý thêm.'
+      })
+    }
+
+    // Cập nhật booking → cancelled
+    const showtimeId = booking.showtime._id?.toString() || booking.showtime.toString()
+    const seatIds = booking.seats.map((s: any) => s.toString())
+
+    booking.status = 'cancelled'
+    await booking.save()
+
+    // Cập nhật payment → refunded, ghi lý do + nhân viên xử lý
+    const payment = await Payment.findOne({ booking: booking._id, status: 'success' })
+    if (payment) {
+      payment.status = 'refunded'
+      ;(payment as any).refundReason = reason.trim()
+      ;(payment as any).refundedBy = req.user!.id
+      ;(payment as any).refundedAt = new Date()
+      await payment.save()
+    }
+
+    // Giải phóng ghế trong Redis và emit socket
+    await releaseSeats(showtimeId, booking.user.toString())
+    try {
+      const io = getIO()
+      seatIds.forEach(seatId => {
+        io.to(`showtime:${showtimeId}`).emit('seat:released', { seatId, showtimeId })
+      })
+    } catch {}
+
+    return res.json({
+      success: true,
+      message: `✅ Đã hoàn vé thành công. Số tiền hoàn: ${refundAmount.toLocaleString('vi-VN')}đ`,
+      data: { refundAmount, reason: reason.trim() }
+    })
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message })
+  }
+}
+
 // GET /admin/bookings
 export async function getAllBookings(req: AuthRequest, res: Response) {
   try {

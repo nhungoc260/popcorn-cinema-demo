@@ -200,6 +200,12 @@ export default function AdminInvoices() {
                           style={{ background: st.bg, color: st.color, border: `1px solid ${st.color}30` }}>
                           {st.label}
                         </span>
+                        {inv.metadata?.refundRequest?.status === 'pending' && (
+                          <div className="mt-1 text-xs px-1.5 py-0.5 rounded inline-flex items-center gap-1"
+                            style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24' }}>
+                            📋 Chờ duyệt hoàn
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
                         {fmtDate(inv.createdAt)}
@@ -248,10 +254,10 @@ export default function AdminInvoices() {
           style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
           onClick={e => e.target === e.currentTarget && setSelected(null)}>
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-            className="w-full max-w-md rounded-2xl overflow-hidden"
-            style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+            className="w-full max-w-md rounded-2xl overflow-hidden flex flex-col"
+            style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)', maxHeight: '90vh' }}>
             {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-4"
+            <div className="flex items-center justify-between px-6 py-4 flex-shrink-0"
               style={{ borderBottom: '1px solid var(--color-glass-border)' }}>
               <h2 className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>
                 🧾 Chi tiết hóa đơn
@@ -261,7 +267,7 @@ export default function AdminInvoices() {
             </div>
 
             {/* Modal body */}
-            <div className="p-6 space-y-3">
+            <div className="p-6 space-y-3 overflow-y-auto">
               {[
                 { label: 'Mã giao dịch', value: selected.transactionId },
                 { label: 'Mã vé',        value: selected.booking?.bookingCode },
@@ -291,6 +297,24 @@ export default function AdminInvoices() {
                   {STATUS_CFG[selected.status]?.label || selected.status}
                 </span>
               </div>
+
+              {/* Yêu cầu hoàn tiền từ Staff */}
+              {selected.metadata?.refundRequest && (
+                <div className="p-4 rounded-xl space-y-2"
+                  style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.25)' }}>
+                  <p className="text-xs font-semibold" style={{ color: '#fbbf24' }}>
+                    📋 Yêu cầu hoàn tiền từ nhân viên
+                    {selected.metadata.refundRequest.status === 'pending' && (
+                      <span className="ml-2 px-1.5 py-0.5 rounded text-xs" style={{ background: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>Chờ duyệt</span>
+                    )}
+                  </p>
+                  <div className="text-xs space-y-1" style={{ color: 'var(--color-text-muted)' }}>
+                    <div>Lý do: <span style={{ color: 'var(--color-text)' }}>{selected.metadata.refundRequest.reason}</span></div>
+                    <div>Nhân viên: <span style={{ color: 'var(--color-text)' }}>{selected.metadata.refundRequest.requestedByName}</span></div>
+                    <div>Thời gian: <span style={{ color: 'var(--color-text)' }}>{new Date(selected.metadata.refundRequest.requestedAt).toLocaleString('vi-VN')}</span></div>
+                  </div>
+                </div>
+              )}
 
               {/* Đổi trạng thái — chỉ Admin */}
               {isAdmin && ALLOWED_TRANSITIONS[selected.status]?.length > 0 && (

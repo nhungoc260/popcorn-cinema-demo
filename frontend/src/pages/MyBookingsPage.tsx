@@ -15,6 +15,7 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = 
   cancelled:       { label: 'Đã hủy',            color: '#F87171',              icon: XCircle },
   checked_in:      { label: 'Đã vào rạp',        color: 'var(--color-text-muted)', icon: QrCode },
   pending_payment: { label: 'Chờ xác nhận CK',   color: '#FB923C',              icon: AlertCircle },
+  refunded:        { label: 'Đã hoàn tiền',       color: '#a78bfa',              icon: XCircle },
 }
 
 export default function MyBookingsPage() {
@@ -109,31 +110,35 @@ export default function MyBookingsPage() {
 
                     {/* Action bar */}
                     <div className="px-4 pb-4 flex gap-2 flex-wrap">
-                      {/* Xem vé */}
-                      {isPaid ? (
-                        <Link to={`/booking-success/${b._id}`}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/5"
-                          style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-glass-border)' }}>
-                          <QrCode className="w-3.5 h-3.5" /> Xem Vé
-                        </Link>
-                      ) : (
-                        <Link to={`/booking-success/${b._id}`}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/5"
-                          style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-glass-border)' }}>
-                          <AlertCircle className="w-3.5 h-3.5" /> Chi tiết
-                        </Link>
-                      )}
-
-                      {/* [MỚI] Xem hoá đơn — chỉ hiện khi đã thanh toán */}
+                      {/* Vé hợp lệ — hiện QR + hoá đơn */}
                       {isPaid && (
-                        <Link to={`/invoice/${b._id}`}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/5"
-                          style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-glass-border)' }}>
-                          <FileText className="w-3.5 h-3.5" /> Hoá Đơn
-                        </Link>
+                        <>
+                          <Link to={`/booking-success/${b._id}`}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/5"
+                            style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-glass-border)' }}>
+                            <QrCode className="w-3.5 h-3.5" /> Xem Vé
+                          </Link>
+                          <Link to={`/invoice/${b._id}`}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/5"
+                            style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-glass-border)' }}>
+                            <FileText className="w-3.5 h-3.5" /> Hoá Đơn
+                          </Link>
+                        </>
                       )}
 
-                      {/* Thanh toán */}
+                      {/* Vé đã hủy hoặc hoàn tiền — chỉ hiện nhãn, KHÔNG có link QR */}
+                      {(b.status === 'cancelled' || b.status === 'refunded') && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+                          style={{
+                            background: b.status === 'refunded' ? 'rgba(167,139,250,0.08)' : 'rgba(248,113,113,0.08)',
+                            border: `1px solid ${b.status === 'refunded' ? 'rgba(167,139,250,0.25)' : 'rgba(248,113,113,0.25)'}`,
+                            color: b.status === 'refunded' ? '#a78bfa' : '#F87171',
+                          }}>
+                          {b.status === 'refunded' ? '💸 Đã hoàn tiền' : '❌ Vé không còn hiệu lực'}
+                        </div>
+                      )}
+
+                      {/* Chờ thanh toán */}
                       {b.status === 'pending' && (
                         <Link to={`/payment/${b._id}`}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold"

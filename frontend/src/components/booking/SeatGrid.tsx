@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useShowtimeSocket } from '../../hooks/useSocket'
 import { useAuthStore } from '../../store/authStore'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface Seat {
   _id: string
@@ -45,6 +46,7 @@ const LEGEND = [
 
 export default function SeatGrid({ seats, showtimeId, selectedSeats, onSelectionChange, maxSeats = 8 }: SeatGridProps) {
   const { user } = useAuthStore()
+  const queryClient = useQueryClient()
   const [localSeats, setLocalSeats] = useState<Seat[]>(seats)
 
   useEffect(() => { setLocalSeats(seats) }, [seats])
@@ -66,15 +68,17 @@ export default function SeatGrid({ seats, showtimeId, selectedSeats, onSelection
   const { selectSeat, deselectSeat } = useShowtimeSocket(showtimeId, handleSeatLocked, handleSeatReleased, handleSeatBooked)
 
   const handleClick = useCallback((seat: Seat) => {
+    console.log('lockedBy:', seat.lockedBy, 'userId:', user?.id, 'user:', user)
     if (seat.type === 'aisle' || seat.type === 'disabled') return
     if (seat.status === 'booked') return
-    if (seat.status === 'locked' && seat.lockedBy !== user?.id) return
+    if (seat.status === 'locked' && seat.lockedBy !== user?.id && seat.lockedBy !== 'other') return
 
     const isSelected = selectedSeats.includes(seat._id)
     let next: string[]
     if (isSelected) {
       next = selectedSeats.filter(id => id !== seat._id)
       deselectSeat(seat._id)
+      queryClient.invalidateQueries({ queryKey: ['seats', showtimeId] })
     } else {
       if (selectedSeats.length >= maxSeats) {
         return

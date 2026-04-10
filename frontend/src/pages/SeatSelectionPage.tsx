@@ -32,7 +32,7 @@ export default function SeatSelectionPage() {
     queryKey: ['seats', showtimeId],
     queryFn: () => showtimeApi.getSeats(showtimeId!),
     enabled: !!showtimeId,
-    refetchInterval: 3000, // fallback polling 3s nếu socket không hoạt động
+    refetchInterval: 1000, // fallback polling 1s nếu socket không hoạt động
   })
 
   // Socket.IO — lắng nghe ghế thay đổi real-time
@@ -47,16 +47,16 @@ export default function SeatSelectionPage() {
       queryClient.invalidateQueries({ queryKey: ['seats', showtimeId] })
     }
 
-    socket.on('seat:held', handleSeatUpdate)
+    socket.on('seat:locked', handleSeatUpdate)
     socket.on('seat:released', handleSeatUpdate)
-    socket.on('seat:booked', handleSeatUpdate)
+    socket.on('seats:booked', handleSeatUpdate)
     socket.on('seats:updated', handleSeatUpdate) // fallback event chung
 
     return () => {
       socket.emit('leave:showtime', showtimeId)
-      socket.off('seat:held', handleSeatUpdate)
+      socket.off('seat:locked', handleSeatUpdate)
       socket.off('seat:released', handleSeatUpdate)
-      socket.off('seat:booked', handleSeatUpdate)
+      socket.off('seats:booked', handleSeatUpdate)
       socket.off('seats:updated', handleSeatUpdate)
     }
   }, [socket, showtimeId, queryClient])

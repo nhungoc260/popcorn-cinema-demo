@@ -11,7 +11,7 @@ export function useSocket() {
   useEffect(() => {
     if (!token) return
     if (!socketInstance) {
-      socketInstance = io('http://localhost:5000', {
+      socketInstance = io(window.location.origin, {
         auth: { token },
         transports: ['websocket'],
         reconnection: true,
@@ -48,7 +48,7 @@ export function useShowtimeSocket(
     if (!showtimeId || !token) return
 
     if (!socketInstance) {
-      socketInstance = io('http://localhost:5000', {
+      socketInstance = io(window.location.origin, {
         auth: { token },
         transports: ['websocket'],
       })

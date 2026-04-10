@@ -184,10 +184,20 @@ export default function SeatGrid({ seats, showtimeId, selectedSeats, onSelection
                           whileTap={seat.status === 'available' && seat.type !== 'aisle' ? { scale: 0.95 } : {}}
                           onClick={() => {
                             if (isCouple && partnerSeat) {
-                              // Click ghế đôi: toggle cả cặp
-                              handleClick(seat)
-                              if (!isSelected) handleClick(partnerSeat)
-                              else if (selectedSeats.includes(partnerSeat._id)) handleClick(partnerSeat)
+                              if (isSelected) {
+                                // Deselect cả 2
+                                const next = selectedSeats.filter(id => id !== seat._id && id !== partnerSeat._id)
+                                deselectSeat(seat._id)
+                                deselectSeat(partnerSeat._id)
+                                onSelectionChange(next, localSeats.filter(s => next.includes(s._id)))
+                              } else {
+                                if (selectedSeats.length + 2 > maxSeats) return
+                                // Select cả 2
+                                const next = [...selectedSeats, seat._id, partnerSeat._id]
+                                selectSeat(seat._id)
+                                selectSeat(partnerSeat._id)
+                                onSelectionChange(next, localSeats.filter(s => next.includes(s._id)))
+                              }
                             } else {
                               handleClick(seat)
                             }

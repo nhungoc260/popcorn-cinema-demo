@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { useAuthStore } from '../store/authStore'
 
@@ -6,7 +6,7 @@ let socketInstance: Socket | null = null
 
 export function useSocket() {
   const { token } = useAuthStore()
-  const socket = useRef<Socket | null>(null)
+  const [, forceUpdate] = useState(0)
 
   useEffect(() => {
     if (!token) return
@@ -15,17 +15,19 @@ export function useSocket() {
         auth: { token },
         transports: ['websocket'],
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: 10,
         reconnectionDelay: 1000,
       })
+      // Force re-render khi socket connect xong để useGroupBooking nhận được
+      socketInstance.on('connect', () => forceUpdate(n => n + 1))
+    } else {
+      forceUpdate(n => n + 1)
     }
-    socket.current = socketInstance
-    return () => {
-      // Don't disconnect on unmount; keep socket alive
-    }
+
+    return () => {}
   }, [token])
 
-  return socket.current
+  return socketInstance
 }
 
 export function useShowtimeSocket(
@@ -36,7 +38,6 @@ export function useShowtimeSocket(
 ) {
   const { token } = useAuthStore()
 
-  // Dùng ref để tránh stale closure — callback luôn là bản mới nhất
   const lockedRef  = useRef(onSeatLocked)
   const releasedRef = useRef(onSeatReleased)
   const bookedRef  = useRef(onSeatBooked)

@@ -26,6 +26,7 @@ export default function SeatSelectionPage() {
 
   const {
     members, isInGroup, isHost, hostUserId,
+    groupSeatMap, allGroupSeatIds,
     createRoom, leaveRoom, kickMember,
     getShareLink, triggerCheckout,
   } = useGroupBooking(showtimeId || '')
@@ -50,8 +51,9 @@ export default function SeatSelectionPage() {
     refetchInterval: isInGroup ? 2000 : false,
   })
 
+  // Booking cá nhân
   const createBookingMutation = useMutation({
-    mutationFn: () => bookingApi.create(showtimeId || '', selectedSeatIds),
+    mutationFn: (seatIds: string[]) => bookingApi.create(showtimeId || '', seatIds),
     onSuccess: (res) => {
       toast.success('Ghế đã được giữ! Thanh toán trong 5 phút.')
       navigate(`/payment/${res.data.data._id}`)
@@ -65,10 +67,8 @@ export default function SeatSelectionPage() {
     setSelectedSeatIds(prev => {
       const removed = prev.filter(id => !ids.includes(id))
       const added = ids.filter(id => !prev.includes(id))
-
       removed.forEach(id => deselectSeat(id))
       added.forEach(id => selectSeat(id))
-
       return ids
     })
     setSelectedSeatObjs(seats)
@@ -85,15 +85,27 @@ export default function SeatSelectionPage() {
     setShowShareModal(true)
   }
 
-  // Host nhấn "Chốt đơn nhóm": thông báo member → tạo booking → navigate
+  // Host chốt đơn: server gom ghế toàn nhóm → trả về → tạo 1 booking chung
   const handleHostCheckout = () => {
-    triggerCheckout()
-    createBookingMutation.mutate()
+    if (allGroupSeatIds.length === 0) {
+      toast.error('Chưa có ai chọn ghế trong nhóm!')
+      return
+    }
+    triggerCheckout((allSeatIds) => {
+      createBookingMutation.mutate(allSeatIds)
+    })
   }
 
   const showtime = stData?.data?.data
   const seats: any[] = seatsData?.data?.data || []
-  const totalAmount = selectedSeatObjs.reduce((s, seat) => s + (seat?.price || 0), 0)
+
+  // Với host trong nhóm: hiển thị ghế của toàn nhóm trong order summary
+  // Với cá nhân / member: hiển thị ghế của bản thân
+  const displaySeats = isInGroup && isHost
+    ? seats.filter(s => allGroupSeatIds.includes(s._id))
+    : selectedSeatObjs
+
+  const totalAmount = displaySeats.reduce((s, seat) => s + (seat?.price || 0), 0)
   const maxCols = seats.length > 0 ? Math.max(...seats.map((s: any) => s.col || s.number || 0)) : 20
   const containerMaxW = maxCols <= 8 ? 'max-w-2xl' : maxCols <= 12 ? 'max-w-3xl' : maxCols <= 16 ? 'max-w-5xl' : 'max-w-7xl'
 
@@ -211,29 +223,57 @@ export default function SeatSelectionPage() {
           <div className="lg:col-span-1">
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
               className="glass-card p-6 sticky top-24 space-y-5">
-              <h3 className="font-display font-semibold text-lg" style={{ color: 'var(--color-text)' }}>Đơn Hàng</h3>
 
-              {selectedSeatObjs.length === 0 ? (
+              <h3 className="font-display font-semibold text-lg" style={{ color: 'var(--color-text)' }}>
+                Đơn Hàng
+                {isInGroup && isHost && allGroupSeatIds.length > 0 && (
+                  <span className="ml-2 text-xs font-normal px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(168,85,247,0.15)', color: '#A855F7' }}>
+                    {allGroupSeatIds.length} ghế nhóm
+                  </span>
+                )}
+              </h3>
+
+              {displaySeats.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="text-4xl mb-3">🪑</div>
-                  <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Chưa chọn ghế nào</p>
-                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-dim)' }}>Nhấp vào ghế để chọn</p>
+                  <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                    {isInGroup && isHost ? 'Chưa có ai chọn ghế' : 'Chưa chọn ghế nào'}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-dim)' }}>
+                    {isInGroup && isHost ? 'Chờ thành viên chọn ghế' : 'Nhấp vào ghế để chọn'}
+                  </p>
                 </div>
               ) : (
                 <>
                   <div className="space-y-2">
-                    {selectedSeatObjs.map(seat => (
-                      <div key={seat._id} className="flex justify-between items-center py-2"
-                        style={{ borderBottom: '1px solid var(--color-glass-border)' }}>
-                        <div>
-                          <span className="font-mono font-bold text-sm" style={{ color: 'var(--color-primary)' }}>{seat.label}</span>
-                          <span className="text-xs ml-2" style={{ color: 'var(--color-text-muted)' }}>{seat.type.toUpperCase()}</span>
+                    {displaySeats.map(seat => {
+                      // Tìm member đang giữ ghế này (để hiện tên)
+                      const ownerEntry = isInGroup && isHost
+                        ? Object.entries(groupSeatMap).find(([, sids]) => sids.includes(seat._id))
+                        : null
+                      const ownerMember = ownerEntry
+                        ? members.find(m => m.userId === ownerEntry[0])
+                        : null
+
+                      return (
+                        <div key={seat._id} className="flex justify-between items-center py-2"
+                          style={{ borderBottom: '1px solid var(--color-glass-border)' }}>
+                          <div>
+                            <span className="font-mono font-bold text-sm" style={{ color: 'var(--color-primary)' }}>{seat.label}</span>
+                            <span className="text-xs ml-2" style={{ color: 'var(--color-text-muted)' }}>{seat.type.toUpperCase()}</span>
+                            {ownerMember && (
+                              <span className="text-xs ml-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                                ({ownerMember.name})
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+                            {seat.price.toLocaleString('vi')}đ
+                          </span>
                         </div>
-                        <span className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
-                          {seat.price.toLocaleString('vi')}đ
-                        </span>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <div className="flex justify-between items-center pt-2">
                     <span className="font-semibold" style={{ color: 'var(--color-text)' }}>Tổng Cộng</span>
@@ -242,24 +282,25 @@ export default function SeatSelectionPage() {
                 </>
               )}
 
-              {/* ✅ PHÂN QUYỀN NÚT: host vs member vs cá nhân */}
+              {/* Phân quyền nút */}
               {isInGroup && !isHost ? (
-                // Member: chỉ xem, chờ host chốt
                 <div className="w-full py-3.5 rounded-xl text-sm text-center"
                   style={{ background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.4)' }}>
                   ⏳ Chờ host chốt đơn...
                 </div>
               ) : (
-                // Host hoặc đặt cá nhân
                 <button
-                  onClick={isHost ? handleHostCheckout : () => createBookingMutation.mutate()}
-                  disabled={selectedSeatIds.length === 0 || createBookingMutation.isPending}
+                  onClick={isHost ? handleHostCheckout : () => createBookingMutation.mutate(selectedSeatIds)}
+                  disabled={
+                    createBookingMutation.isPending ||
+                    (isHost ? allGroupSeatIds.length === 0 : selectedSeatIds.length === 0)
+                  }
                   className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {createBookingMutation.isPending
                     ? <span className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
                     : isHost
-                      ? <>👑 Chốt đơn nhóm <ArrowRight className="w-4 h-4" /></>
+                      ? <>👑 Chốt đơn nhóm ({allGroupSeatIds.length} ghế) <ArrowRight className="w-4 h-4" /></>
                       : <>Tiếp Tục <ArrowRight className="w-4 h-4" /></>
                   }
                 </button>
@@ -306,33 +347,47 @@ export default function SeatSelectionPage() {
                   <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
                     {members?.length || 0} người trong phòng:
                   </p>
-                  {members.map((m, i) => (
-                    <div key={m.userId}
-                      className="flex items-center justify-between px-3 py-2 rounded-xl"
-                      style={{ background: 'rgba(255,255,255,0.04)' }}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
-                          style={{ background: `hsl(${i * 60}, 70%, 45%)`, color: '#fff' }}>
-                          {m.name.charAt(0).toUpperCase()}
+                  {members.map((m, i) => {
+                    const memberSeats = groupSeatMap[m.userId] || []
+                    return (
+                      <div key={m.userId}
+                        className="flex items-center justify-between px-3 py-2 rounded-xl"
+                        style={{ background: 'rgba(255,255,255,0.04)' }}>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                            style={{ background: `hsl(${i * 60}, 70%, 45%)`, color: '#fff' }}>
+                            {m.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm" style={{ color: '#fff' }}>{m.name}</span>
+                              {m.userId === hostUserId && (
+                                <span className="text-xs px-1.5 py-0.5 rounded-md flex-shrink-0"
+                                  style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B' }}>
+                                  👑 Host
+                                </span>
+                              )}
+                            </div>
+                            {/* Hiện ghế member đang chọn */}
+                            {memberSeats.length > 0 && (
+                              <p className="text-xs mt-0.5" style={{ color: '#A855F7' }}>
+                                Đang giữ: {seats.filter(s => memberSeats.includes(s._id)).map(s => s.label).join(', ')}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <span className="text-sm" style={{ color: '#fff' }}>{m.name}</span>
-                        {m.userId === hostUserId && (
-                          <span className="text-xs px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B' }}>
-                            👑 Host
-                          </span>
+                        {isHost && m.userId !== hostUserId && (
+                          <button
+                            onClick={() => kickMember(m.userId)}
+                            title="Kick khỏi nhóm"
+                            className="p-1.5 rounded-lg transition-colors hover:bg-red-500/20 flex-shrink-0"
+                            style={{ color: 'rgba(248,113,113,0.6)' }}>
+                            <UserX className="w-3.5 h-3.5" />
+                          </button>
                         )}
                       </div>
-                      {isHost && m.userId !== hostUserId && (
-                        <button
-                          onClick={() => kickMember(m.userId)}
-                          title="Kick khỏi nhóm"
-                          className="p-1.5 rounded-lg transition-colors hover:bg-red-500/20"
-                          style={{ color: 'rgba(248,113,113,0.6)' }}>
-                          <UserX className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
 

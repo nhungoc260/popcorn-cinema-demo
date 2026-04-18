@@ -18,6 +18,10 @@ export function useGroupBooking(showtimeId: string) {
   const [isInGroup, setIsInGroup] = useState(false)
   const [isHost, setIsHost] = useState(false)
   const [hostUserId, setHostUserId] = useState<string | null>(null)
+  // userId → seatIds[], track ghế của toàn nhóm
+  const [groupSeatMap, setGroupSeatMap] = useState<Record<string, string[]>>({})
+  // callback để SeatSelectionPage xử lý khi checkout:ready
+  const onCheckoutReadyRef = useRef<((seatIds: string[]) => void) | null>(null)
 
   const hasJoinedRoomRef = useRef<string | null>(null)
 
@@ -62,37 +66,26 @@ export function useGroupBooking(showtimeId: string) {
     const tryJoin = () => {
       if (!socket.connected) return
       if (hasJoinedRoomRef.current === roomToJoin) return
-
       hasJoinedRoomRef.current = roomToJoin
-
-      socket.emit('group:join', {
-        roomId: roomToJoin,
-        user: userInfoRef.current
-      })
-
+      socket.emit('group:join', { roomId: roomToJoin, user: userInfoRef.current })
       socket.emit('join:showtime', showtimeId)
-
       setRoomId(roomToJoin)
     }
 
     tryJoin()
-
     const interval = setInterval(() => {
       if (!hasJoinedRoomRef.current) tryJoin()
     }, 1000)
-
     return () => clearInterval(interval)
   }, [socket, user, showtimeId])
 
   // RECONNECT
   useEffect(() => {
     if (!socket || !roomId) return
-
     const handleReconnect = () => {
       socket.emit('group:join', { roomId, user: userInfoRef.current })
       socket.emit('join:showtime', showtimeId)
     }
-
     socket.on('connect', handleReconnect)
     return () => { socket.off('connect', handleReconnect) }
   }, [socket, roomId, showtimeId])
@@ -107,14 +100,17 @@ export function useGroupBooking(showtimeId: string) {
       setIsHost(true)
       setHostUserId(userInfoRef.current.userId)
       setMembers([userInfoRef.current])
+      setGroupSeatMap({})
     }
 
-    const onJoined = ({ roomId, members, hostUserId }: any) => {
+    const onJoined = ({ roomId, members, hostUserId, seatMap }: any) => {
       setRoomId(roomId)
       setMembers(members)
       setIsInGroup(true)
       setHostUserId(hostUserId)
       setIsHost(userInfoRef.current.userId === hostUserId)
+      // Nhận seatMap hiện tại của phòng khi mới join
+      if (seatMap) setGroupSeatMap(seatMap)
     }
 
     const onMembers = ({ members: newMembers, hostUserId: hid }: any) => {
@@ -122,11 +118,17 @@ export function useGroupBooking(showtimeId: string) {
       setMembers(newMembers)
     }
 
+    // Server broadcast seatMap mỗi khi có thay đổi
+    const onSeatMap = ({ seatMap }: { seatMap: Record<string, string[]> }) => {
+      setGroupSeatMap(seatMap)
+    }
+
     const onKicked = () => {
       setRoomId(null)
       setMembers([])
       setIsInGroup(false)
       setIsHost(false)
+      setGroupSeatMap({})
       hasJoinedRoomRef.current = null
       toast.error('Bạn đã bị host xóa khỏi nhóm')
     }
@@ -136,6 +138,7 @@ export function useGroupBooking(showtimeId: string) {
       setRoomId(null)
       setMembers([])
       setIsInGroup(false)
+      setGroupSeatMap({})
       toast.error(message || 'Lỗi phòng')
     }
 
@@ -143,7 +146,7 @@ export function useGroupBooking(showtimeId: string) {
       hasJoinedRoomRef.current = null
     }
 
-    // Host chốt đơn → member nhận thông báo chờ
+    // Member nhận thông báo host đã chốt
     const onCheckout = () => {
       toast('👑 Host đã chốt đơn! Vui lòng chờ xác nhận thanh toán...', {
         duration: 6000,
@@ -151,31 +154,39 @@ export function useGroupBooking(showtimeId: string) {
       })
     }
 
+    // Host nhận allSeatIds từ server → gọi callback để tạo booking
+    const onCheckoutReady = ({ allSeatIds }: { allSeatIds: string[] }) => {
+      if (onCheckoutReadyRef.current) {
+        onCheckoutReadyRef.current(allSeatIds)
+      }
+    }
+
     socket.on('group:created', onCreated)
     socket.on('group:joined', onJoined)
     socket.on('group:members', onMembers)
+    socket.on('group:seatmap', onSeatMap)
     socket.on('group:kicked', onKicked)
     socket.on('group:error', onError)
     socket.on('disconnect', onDisconnect)
     socket.on('group:checkout', onCheckout)
+    socket.on('group:checkout:ready', onCheckoutReady)
 
     return () => {
       socket.off('group:created', onCreated)
       socket.off('group:joined', onJoined)
       socket.off('group:members', onMembers)
+      socket.off('group:seatmap', onSeatMap)
       socket.off('group:kicked', onKicked)
       socket.off('group:error', onError)
       socket.off('disconnect', onDisconnect)
       socket.off('group:checkout', onCheckout)
+      socket.off('group:checkout:ready', onCheckoutReady)
     }
   }, [socket])
 
   const createRoom = useCallback(() => {
     if (!socket) return
-    socket.emit('group:create', {
-      showtimeId,
-      user: userInfoRef.current
-    })
+    socket.emit('group:create', { showtimeId, user: userInfoRef.current })
   }, [socket, showtimeId])
 
   const leaveRoom = useCallback(() => {
@@ -185,6 +196,7 @@ export function useGroupBooking(showtimeId: string) {
     setMembers([])
     setIsInGroup(false)
     setIsHost(false)
+    setGroupSeatMap({})
     hasJoinedRoomRef.current = null
   }, [socket, roomId])
 
@@ -203,11 +215,15 @@ export function useGroupBooking(showtimeId: string) {
     socket.emit('group:seat:hover', { roomId, seatId, user: userInfoRef.current })
   }, [socket, roomId])
 
-  // Host emit lệnh chốt đơn cho tất cả member
-  const triggerCheckout = useCallback(() => {
+  // Host emit checkout → server gom seat → trả về group:checkout:ready
+  const triggerCheckout = useCallback((onReady: (allSeatIds: string[]) => void) => {
     if (!socket || !roomId || !isHost) return
+    onCheckoutReadyRef.current = onReady
     socket.emit('group:checkout', { roomId })
   }, [socket, roomId, isHost])
+
+  // Tổng ghế toàn nhóm (để hiển thị preview trên UI)
+  const allGroupSeatIds = Object.values(groupSeatMap).flat()
 
   return {
     roomId,
@@ -215,6 +231,8 @@ export function useGroupBooking(showtimeId: string) {
     isInGroup,
     isHost,
     hostUserId,
+    groupSeatMap,
+    allGroupSeatIds,
     createRoom,
     leaveRoom,
     kickMember,

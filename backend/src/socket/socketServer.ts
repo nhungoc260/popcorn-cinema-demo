@@ -8,6 +8,7 @@ let io: Server;
 interface GroupRoom {
   hostUserId: string
   members: Map<string, { userId: string; name: string; avatar: string }>
+  seatMap: Map<string, string[]> // userId → seatIds[]
   createdAt: number
 }
 
@@ -55,7 +56,7 @@ export function initSocket(server: http.Server) {
       socket.leave(`showtime:${showtimeId}`)
     })
 
-    // Seat locking
+    // ── Seat locking ─────────────────────────────
     socket.on('seat:select', async ({ showtimeId, seatId }: { showtimeId: string; seatId: string }) => {
       try {
         const locked = await lockSeat(showtimeId, seatId, userId);
@@ -67,6 +68,22 @@ export function initSocket(server: http.Server) {
             expiresAt: Date.now() + (parseInt(process.env.SEAT_LOCK_TTL || '300') * 1000),
           });
           socket.emit('seat:select:ok', { seatId });
+
+          // ✅ Cập nhật seatMap trong group room và broadcast
+          for (const [roomId, room] of groupRooms.entries()) {
+            if (room.members.has(userId)) {
+              const seats = room.seatMap.get(userId) || []
+              if (!seats.includes(seatId)) {
+                room.seatMap.set(userId, [...seats, seatId])
+              }
+              // Broadcast toàn bộ seatMap cho cả phòng
+              const seatMapObj = Object.fromEntries(
+                [...room.seatMap.entries()].map(([uid, sids]) => [uid, sids])
+              )
+              io.to(roomId).emit('group:seatmap', { seatMap: seatMapObj })
+              break
+            }
+          }
         } else {
           const owner = await getSeatLockOwner(showtimeId, seatId);
           socket.emit('seat:select:fail', {
@@ -85,11 +102,24 @@ export function initSocket(server: http.Server) {
         const released = await unlockSeat(showtimeId, seatId, userId);
         if (released) {
           io.to(`showtime:${showtimeId}`).emit('seat:released', { seatId, showtimeId });
+
+          // ✅ Xóa seat khỏi seatMap và broadcast
+          for (const [roomId, room] of groupRooms.entries()) {
+            if (room.members.has(userId)) {
+              const seats = (room.seatMap.get(userId) || []).filter(s => s !== seatId)
+              room.seatMap.set(userId, seats)
+              const seatMapObj = Object.fromEntries(
+                [...room.seatMap.entries()].map(([uid, sids]) => [uid, sids])
+              )
+              io.to(roomId).emit('group:seatmap', { seatMap: seatMapObj })
+              break
+            }
+          }
         }
       } catch {}
     });
 
-    // GROUP BOOKING
+    // ── GROUP BOOKING ─────────────────────────────
 
     socket.on('group:create', ({ showtimeId, user }: { showtimeId: string; user: any }) => {
       const roomId = `group_${showtimeId}_${Date.now()}`
@@ -99,6 +129,7 @@ export function initSocket(server: http.Server) {
       groupRooms.set(roomId, {
         hostUserId: userId,
         members: new Map([[userId, user]]),
+        seatMap: new Map(),
         createdAt: Date.now(),
       })
 
@@ -142,10 +173,16 @@ export function initSocket(server: http.Server) {
 
       console.log('✅ JOINED:', roomId, 'members:', members.length)
 
+      // Gửi seatMap hiện tại cho member mới join
+      const seatMapObj = Object.fromEntries(
+        [...room.seatMap.entries()].map(([uid, sids]) => [uid, sids])
+      )
+
       socket.emit('group:joined', {
         roomId,
         members,
-        hostUserId: room.hostUserId
+        hostUserId: room.hostUserId,
+        seatMap: seatMapObj,
       })
 
       io.to(roomId).emit('group:members', {
@@ -160,6 +197,7 @@ export function initSocket(server: http.Server) {
       if (targetUserId === userId) return
 
       room.members.delete(targetUserId)
+      room.seatMap.delete(targetUserId)
 
       const members = [...room.members.values()]
 
@@ -168,23 +206,34 @@ export function initSocket(server: http.Server) {
         members,
         hostUserId: room.hostUserId
       })
+
+      // Broadcast seatMap sau khi kick
+      const seatMapObj = Object.fromEntries(
+        [...room.seatMap.entries()].map(([uid, sids]) => [uid, sids])
+      )
+      io.to(roomId).emit('group:seatmap', { seatMap: seatMapObj })
     })
 
-    // ✅ HOST CHỐT ĐƠN — chỉ host mới được emit, broadcast cho tất cả member
+    // ✅ HOST CHỐT ĐƠN — trả về allSeatIds để host tạo booking
     socket.on('group:checkout', ({ roomId }: { roomId: string }) => {
       const room = groupRooms.get(roomId)
 
       if (!room) return
       if (room.hostUserId !== userId) {
-        // Không phải host → bỏ qua, không làm gì
         console.log('⛔ Non-host tried to checkout:', userId)
         return
       }
 
-      console.log('✅ HOST CHECKOUT:', roomId, userId)
+      // Gom tất cả seatIds của cả nhóm
+      const allSeatIds = Array.from(room.seatMap.values()).flat()
 
-      // Thông báo tất cả member (trừ host) biết host đã chốt
+      console.log('✅ HOST CHECKOUT:', roomId, 'allSeats:', allSeatIds)
+
+      // Thông báo member biết host đã chốt
       socket.to(roomId).emit('group:checkout', { roomId })
+
+      // Trả về allSeatIds cho host để tạo booking
+      socket.emit('group:checkout:ready', { allSeatIds })
     })
 
     socket.on('group:seat:hover', ({ roomId, seatId, user }: any) => {
@@ -196,6 +245,7 @@ export function initSocket(server: http.Server) {
         const room = groupRooms.get(roomId)!
 
         room.members.delete(userId)
+        room.seatMap.delete(userId)
 
         const members = [...room.members.values()]
 
@@ -203,6 +253,12 @@ export function initSocket(server: http.Server) {
           members,
           hostUserId: room.hostUserId
         })
+
+        // Broadcast seatMap sau khi leave
+        const seatMapObj = Object.fromEntries(
+          [...room.seatMap.entries()].map(([uid, sids]) => [uid, sids])
+        )
+        io.to(roomId).emit('group:seatmap', { seatMap: seatMapObj })
 
         if (members.length === 0) {
           groupRooms.delete(roomId)
@@ -218,6 +274,7 @@ export function initSocket(server: http.Server) {
       for (const [roomId, room] of groupRooms.entries()) {
         if (room.members.has(userId)) {
           room.members.delete(userId)
+          room.seatMap.delete(userId)
 
           const members = [...room.members.values()]
 
@@ -225,6 +282,11 @@ export function initSocket(server: http.Server) {
             members,
             hostUserId: room.hostUserId
           })
+
+          const seatMapObj = Object.fromEntries(
+            [...room.seatMap.entries()].map(([uid, sids]) => [uid, sids])
+          )
+          io.to(roomId).emit('group:seatmap', { seatMap: seatMapObj })
 
           if (members.length === 0) {
             groupRooms.delete(roomId)
@@ -236,7 +298,6 @@ export function initSocket(server: http.Server) {
 
   setInterval(() => {
     const now = Date.now()
-
     for (const [roomId, room] of groupRooms.entries()) {
       if (now - room.createdAt > ROOM_TTL_MS) {
         console.log('🧹 CLEAN ROOM:', roomId)
@@ -262,24 +323,15 @@ function startSeatExpiryWatcher() {
     try {
       for (const [showtimeId, seatIds] of trackedLocks.entries()) {
         const toRemove: string[] = [];
-
         for (const seatId of seatIds) {
           const owner = await getSeatLockOwner(showtimeId, seatId);
-
           if (!owner) {
-            io.to(`showtime:${showtimeId}`).emit('seat:released', {
-              seatId,
-              showtimeId
-            })
+            io.to(`showtime:${showtimeId}`).emit('seat:released', { seatId, showtimeId })
             toRemove.push(seatId);
           }
         }
-
         toRemove.forEach(id => seatIds.delete(id));
-
-        if (seatIds.size === 0) {
-          trackedLocks.delete(showtimeId);
-        }
+        if (seatIds.size === 0) trackedLocks.delete(showtimeId);
       }
     } catch {}
   }, 10000);

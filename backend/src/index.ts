@@ -24,6 +24,7 @@ import userRoutes from './routes/user.routes';
 import reviewRoutes from './routes/review.routes';
 import couponRoutes from './routes/coupon.routes';
 import reportRoutes from './routes/report.routes';
+import aiRoutes from './routes/ai.routes';
 
 const app = express();
 const server = http.createServer(app);
@@ -61,6 +62,8 @@ app.get('*', (_, res) => {
   res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
 });
 app.use(errorHandler);
+app.use(`${API}/ai`, aiRoutes);
+
 
 const PORT = process.env.PORT || 5000;
 

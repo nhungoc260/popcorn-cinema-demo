@@ -60,18 +60,12 @@ export function useGroupBooking(showtimeId: string) {
       return
     }
 
-    let attempts = 0
-    const interval = setInterval(() => {
-    attempts++
-    if (socket.connected) {
-        clearInterval(interval)
-        doJoin()
-    } else if (attempts >= 30) {
-        clearInterval(interval)
-    }
-    }, 3000)
+    // Dùng event thay vì polling - socket.io tự reconnect, khi connect xong sẽ fire
+    socket.once('connect', doJoin)
 
-    return () => clearInterval(interval)
+    return () => {
+      socket.off('connect', doJoin)
+    }
   }, [socket, user])
 
   useEffect(() => {

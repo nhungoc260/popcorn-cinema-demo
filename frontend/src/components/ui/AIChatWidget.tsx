@@ -149,7 +149,7 @@ export default function AIChatWidget() {
 
       {open && (
         <div
-          className="fixed bottom-24 right-6 z-50 w-96 rounded-2xl overflow-hidden flex flex-col"
+          className="fixed bottom-24 right-0 left-0 mx-3 sm:left-auto sm:right-6 sm:w-96 z-50 rounded-2xl overflow-hidden flex flex-col"
           style={{
             height: '560px',
             background: 'linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%)',

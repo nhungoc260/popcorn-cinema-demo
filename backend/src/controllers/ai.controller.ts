@@ -31,7 +31,7 @@ Ví dụ SAI: [PHIM_ID: "69cb138b945925c03bdc08ec"]`;
     const lastMessage = messages[messages.length - 1].content;
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+      model: 'llama-3.3-70b-versatile',
       messages: [
         { role: 'system', content: systemPrompt },
         ...history,

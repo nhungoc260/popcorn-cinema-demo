@@ -18,6 +18,14 @@ interface MovieSuggestion {
   status: string
 }
 
+// Render markdown đơn giản: **chữ** → <strong>
+function renderMarkdown(text: string) {
+  const parts = text.split(/\*\*(.*?)\*\*/g)
+  return parts.map((part, i) =>
+    i % 2 === 1 ? <strong key={i} style={{ color: '#fff', fontWeight: 700 }}>{part}</strong> : part
+  )
+}
+
 export default function AIChatWidget() {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
@@ -76,9 +84,21 @@ export default function AIChatWidget() {
       const data = await response.json()
       const text = data.data?.text || 'Xin lỗi, mình không hiểu. Bạn có thể nói rõ hơn không?'
 
-      const movieIdMatches = text.matchAll(/\[PHIM_ID:\s*["']?([a-f0-9]+)["']?\s*\]/g)
-      const suggestedIds = [...movieIdMatches].map((m: any) => m[1])
-      const suggestedMovies = movies.filter(m => suggestedIds.includes(m._id))
+      // Match PHIM_ID từ response
+      const movieIdMatches = [...text.matchAll(/\[PHIM_ID:\s*["']?([a-f0-9]+)["']?\s*\]/g)]
+      const suggestedIds = movieIdMatches.map((m: any) => m[1])
+
+      // Match theo ID trước, nếu không có thì match theo title trong text
+      let suggestedMovies = movies.filter(m => suggestedIds.includes(m._id))
+
+      // Fallback: nếu không match được ID, tìm tên phim trong text
+      if (suggestedMovies.length === 0) {
+        suggestedMovies = movies.filter(m =>
+          text.toUpperCase().includes(m.title.toUpperCase())
+        ).slice(0, 3)
+      }
+
+      // Xóa tag PHIM_ID khỏi text hiển thị
       const cleanText = text.replace(/\[PHIM_ID:\s*["']?[a-f0-9]+["']?\s*\]/g, '').trim()
 
       setMessages(prev => [...prev, {
@@ -143,15 +163,10 @@ export default function AIChatWidget() {
               background: 'linear-gradient(135deg, rgba(168,85,247,0.25) 0%, rgba(124,58,237,0.15) 100%)',
               borderBottom: '1px solid rgba(168,85,247,0.2)',
             }}>
-            {/* Glow effect */}
             <div className="absolute -top-4 -left-4 w-24 h-24 rounded-full opacity-20"
               style={{ background: 'radial-gradient(circle, #A855F7, transparent)' }} />
-
             <div className="relative w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
-              style={{
-                background: 'linear-gradient(135deg, #A855F7, #7C3AED)',
-                boxShadow: '0 4px 12px rgba(168,85,247,0.4)',
-              }}>
+              style={{ background: 'linear-gradient(135deg, #A855F7, #7C3AED)', boxShadow: '0 4px 12px rgba(168,85,247,0.4)' }}>
               🤖
             </div>
             <div className="flex-1">
@@ -161,7 +176,6 @@ export default function AIChatWidget() {
                 <span style={{ color: 'rgba(255,255,255,0.5)' }}>Sẵn sàng tư vấn phim</span>
               </div>
             </div>
-            {/* Close button */}
             <button
               onClick={() => setOpen(false)}
               className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-white/10"
@@ -178,14 +192,12 @@ export default function AIChatWidget() {
             style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(168,85,247,0.2) transparent' }}>
             {messages.map((msg, i) => (
               <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                {/* Bot avatar */}
                 {msg.role === 'assistant' && (
                   <div className="w-7 h-7 rounded-xl flex items-center justify-center text-sm flex-shrink-0 mt-1"
                     style={{ background: 'linear-gradient(135deg, #A855F7, #7C3AED)' }}>
                     🤖
                   </div>
                 )}
-
                 <div className="max-w-[80%]">
                   <div
                     className="rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap"
@@ -201,7 +213,8 @@ export default function AIChatWidget() {
                       borderBottomLeftRadius: 4,
                     }}
                   >
-                    {msg.content}
+                    {/* Render markdown **chữ** → bold */}
+                    {renderMarkdown(msg.content)}
                   </div>
 
                   {/* Card phim */}
@@ -256,7 +269,6 @@ export default function AIChatWidget() {
               </div>
             ))}
 
-            {/* Loading dots */}
             {loading && (
               <div className="flex gap-2 justify-start">
                 <div className="w-7 h-7 rounded-xl flex items-center justify-center text-sm flex-shrink-0"

@@ -5,7 +5,6 @@ import { lockSeat, unlockSeat, getSeatLockOwner } from '../config/redis';
 
 let io: Server;
 
-// ── Group Rooms - để ngoài connection để share giữa các user ──
 const groupRooms = new Map<string, { members: Map<string, { userId: string; name: string; avatar: string }> }>()
 
 export function initSocket(server: http.Server) {
@@ -18,7 +17,6 @@ export function initSocket(server: http.Server) {
     pingTimeout: 60000,
   });
 
-  // Auth middleware
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error('Authentication required'));
@@ -35,11 +33,9 @@ export function initSocket(server: http.Server) {
   io.on('connection', (socket: Socket) => {
     const userId = (socket as any).userId;
 
-    // ── Auto join user room để nhận notification cá nhân ──
     socket.join(`user:${userId}`)
     socket.on('join:user', (uid: string) => socket.join(`user:${uid}`))
 
-    // ── Join showtime room ──────────────────────────────
     socket.on('join:showtime', (showtimeId: string) => {
       socket.join(`showtime:${showtimeId}`);
     });
@@ -48,7 +44,6 @@ export function initSocket(server: http.Server) {
       socket.leave(`showtime:${showtimeId}`);
     });
 
-    // ── Select seat (lock → notify ALL clients) ────────
     socket.on('seat:select', async ({ showtimeId, seatId }: { showtimeId: string; seatId: string }) => {
       try {
         const locked = await lockSeat(showtimeId, seatId, userId);
@@ -69,7 +64,6 @@ export function initSocket(server: http.Server) {
       }
     });
 
-    // ── Deselect seat ──────────────────────────────────
     socket.on('seat:deselect', async ({ showtimeId, seatId }: { showtimeId: string; seatId: string }) => {
       try {
         const released = await unlockSeat(showtimeId, seatId, userId);
@@ -79,7 +73,6 @@ export function initSocket(server: http.Server) {
       } catch {}
     });
 
-    // ── Group Booking ──────────────────────────────────
     socket.on('group:create', ({ showtimeId, user }: { showtimeId: string; user: any }) => {
       const roomId = `group_${showtimeId}_${Date.now()}`
       groupRooms.set(roomId, { members: new Map() })
@@ -91,9 +84,9 @@ export function initSocket(server: http.Server) {
     })
 
     socket.on('group:join', ({ roomId, user }: { roomId: string; user: any }) => {
+      // Tự tạo lại room nếu không tồn tại (server restart mất RAM)
       if (!groupRooms.has(roomId)) {
-        socket.emit('group:error', { message: 'Phòng không tồn tại hoặc đã hết hạn!' })
-        return
+        groupRooms.set(roomId, { members: new Map() })
       }
       groupRooms.get(roomId)!.members.set(userId, user)
       socket.join(roomId)
@@ -116,9 +109,7 @@ export function initSocket(server: http.Server) {
       socket.leave(roomId)
     })
 
-    // ── Disconnect ─────────────────────────────────────
     socket.on('disconnect', () => {
-      // Cleanup group rooms khi disconnect
       for (const [roomId, room] of groupRooms.entries()) {
         if (room.members.has(userId)) {
           room.members.delete(userId)
@@ -130,14 +121,12 @@ export function initSocket(server: http.Server) {
     });
   });
 
-  // ── FIX QUAN TRỌNG: Poll Redis để detect ghế hết TTL ──
   startSeatExpiryWatcher();
 
   console.log('✅ Socket.io initialized');
   return io;
 }
 
-// ── Seat Expiry Watcher ────────────────────────────────
 const trackedLocks = new Map<string, Set<string>>();
 
 function startSeatExpiryWatcher() {

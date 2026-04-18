@@ -29,7 +29,6 @@ export function useGroupBooking(showtimeId: string) {
     }
   }, [user])
 
-  // Join room từ URL khi có đủ socket + user
   useEffect(() => {
     if (!socket || !user || hasJoinedRef.current) return
 
@@ -61,7 +60,6 @@ export function useGroupBooking(showtimeId: string) {
       return
     }
 
-    // Retry mỗi 2s cho đến khi connect được (tối đa 10 lần - 20s)
     let attempts = 0
     const interval = setInterval(() => {
       attempts++
@@ -76,7 +74,6 @@ export function useGroupBooking(showtimeId: string) {
     return () => clearInterval(interval)
   }, [socket, user])
 
-  // Lắng nghe các sự kiện nhóm
   useEffect(() => {
     if (!socket) return
 
@@ -97,7 +94,7 @@ export function useGroupBooking(showtimeId: string) {
     }
 
     const onError = ({ message }: { message: string }) => {
-      alert(message)
+      console.error('group:error', message)
     }
 
     socket.on('group:created', onCreated)

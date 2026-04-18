@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import Layout from './components/layout/Layout'
 import AdminLayout from './components/admin/AdminLayout'
@@ -42,8 +42,6 @@ import StaffCounter from './pages/staff/StaffCounter'
 function PrivateRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
   const { user, token } = useAuthStore()
   if (!token) {
-    // Lưu groupRoom vào localStorage trước khi redirect login
-    // để sau khi login xong vẫn join được nhóm
     const params = new URLSearchParams(window.location.search)
     const groupRoom = params.get('groupRoom')
     if (groupRoom) {
@@ -63,6 +61,8 @@ function AdminLayoutGuard({ roles }: { roles?: string[] }) {
 }
 
 export default function App() {
+  const location = useLocation()
+
   return (
     <div className="noise-overlay min-h-screen" style={{ background: 'var(--color-bg)' }}>
 
@@ -78,7 +78,11 @@ export default function App() {
           <Route path="showtimes" element={<ShowtimesPage />} />
           <Route path="theaters" element={<TheatersPage />} />
           <Route path="booking/:showtimeId" element={<PrivateRoute><BookingPage /></PrivateRoute>} />
-          <Route path="seats/:showtimeId" element={<PrivateRoute><SeatSelectionPage /></PrivateRoute>} />
+          <Route path="seats/:showtimeId" element={
+            <PrivateRoute>
+              <SeatSelectionPage key={location.pathname + location.search} />
+            </PrivateRoute>
+          } />
           <Route path="payment/:bookingId" element={<PrivateRoute><PaymentPage /></PrivateRoute>} />
           <Route path="booking-success/:bookingId" element={<PrivateRoute><BookingSuccessPage /></PrivateRoute>} />
           <Route path="my-bookings" element={<PrivateRoute><MyBookingsPage /></PrivateRoute>} />

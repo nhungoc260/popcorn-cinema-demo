@@ -10,6 +10,7 @@ const socket_io_1 = require("socket.io");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const redis_1 = require("../config/redis");
 let io;
+const groupRooms = new Map();
 function initSocket(server) {
     io = new socket_io_1.Server(server, {
         cors: {
@@ -19,7 +20,6 @@ function initSocket(server) {
         },
         pingTimeout: 60000,
     });
-    // Auth middleware
     io.use((socket, next) => {
         const token = socket.handshake.auth.token;
         if (!token)
@@ -36,28 +36,22 @@ function initSocket(server) {
     });
     io.on('connection', (socket) => {
         const userId = socket.userId;
-        // ── Auto join user room để nhận notification cá nhân ──
         socket.join(`user:${userId}`);
         socket.on('join:user', (uid) => socket.join(`user:${uid}`));
-        // ── Join showtime room ──────────────────────────────
         socket.on('join:showtime', (showtimeId) => {
             socket.join(`showtime:${showtimeId}`);
         });
         socket.on('leave:showtime', (showtimeId) => {
             socket.leave(`showtime:${showtimeId}`);
         });
-        // ── Select seat (lock → notify ALL clients) ────────
-        // FIX: Emit tới TẤT CẢ client trong room (kể cả nhân viên/admin)
         socket.on('seat:select', async ({ showtimeId, seatId }) => {
             try {
                 const locked = await (0, redis_1.lockSeat)(showtimeId, seatId, userId);
                 if (locked) {
-                    // Emit tới tất cả client trong showtime room (bao gồm nhân viên & admin)
                     io.to(`showtime:${showtimeId}`).emit('seat:locked', {
                         seatId,
                         userId,
                         showtimeId,
-                        // Thêm ttl để frontend hiển thị countdown
                         expiresAt: Date.now() + (parseInt(process.env.SEAT_LOCK_TTL || '300') * 1000),
                     });
                     socket.emit('seat:select:ok', { seatId });
@@ -71,34 +65,66 @@ function initSocket(server) {
                 socket.emit('seat:select:fail', { seatId, reason: 'Server error' });
             }
         });
-        // ── Deselect seat ──────────────────────────────────
         socket.on('seat:deselect', async ({ showtimeId, seatId }) => {
             try {
                 const released = await (0, redis_1.unlockSeat)(showtimeId, seatId, userId);
                 if (released) {
-                    // FIX: Emit tới TẤT CẢ (không chỉ người hủy)
                     io.to(`showtime:${showtimeId}`).emit('seat:released', { seatId, showtimeId });
                 }
             }
             catch { }
         });
+        socket.on('group:create', ({ showtimeId, user }) => {
+            const roomId = `group_${showtimeId}_${Date.now()}`;
+            groupRooms.set(roomId, { members: new Map() });
+            groupRooms.get(roomId).members.set(userId, user);
+            socket.join(roomId);
+            const members = [...groupRooms.get(roomId).members.values()];
+            socket.emit('group:created', { roomId });
+            socket.emit('group:members', { members });
+        });
+        socket.on('group:join', ({ roomId, user }) => {
+            // Tự tạo lại room nếu không tồn tại (server restart mất RAM)
+            if (!groupRooms.has(roomId)) {
+                groupRooms.set(roomId, { members: new Map() });
+            }
+            groupRooms.get(roomId).members.set(userId, user);
+            socket.join(roomId);
+            const members = [...groupRooms.get(roomId).members.values()];
+            io.to(roomId).emit('group:members', { members });
+            socket.emit('group:joined', { roomId, members });
+        });
+        socket.on('group:seat:hover', ({ roomId, seatId, user }) => {
+            socket.to(roomId).emit('group:seat:hover', { seatId, user });
+        });
+        socket.on('group:leave', ({ roomId }) => {
+            if (groupRooms.has(roomId)) {
+                groupRooms.get(roomId).members.delete(userId);
+                const members = [...groupRooms.get(roomId).members.values()];
+                io.to(roomId).emit('group:members', { members });
+                if (members.length === 0)
+                    groupRooms.delete(roomId);
+            }
+            socket.leave(roomId);
+        });
         socket.on('disconnect', () => {
-            // TTL/memory cleanup handles expiry automatically
-            // Polling bên dưới sẽ emit seat:released khi TTL hết
+            for (const [roomId, room] of groupRooms.entries()) {
+                if (room.members.has(userId)) {
+                    room.members.delete(userId);
+                    const members = [...room.members.values()];
+                    io.to(roomId).emit('group:members', { members });
+                    if (members.length === 0)
+                        groupRooms.delete(roomId);
+                }
+            }
         });
     });
-    // ── FIX QUAN TRỌNG: Poll Redis để detect ghế hết TTL ──
-    // Khi Redis TTL tự xóa key sau 5 phút, backend KHÔNG biết → frontend không được thông báo
-    // Giải pháp: Track danh sách ghế đang lock, poll mỗi 10 giây, emit seat:released khi mất
     startSeatExpiryWatcher();
     console.log('✅ Socket.io initialized');
     return io;
 }
-// ── Seat Expiry Watcher ────────────────────────────────
-// Track ghế đang lock để phát hiện khi TTL hết và emit realtime
-const trackedLocks = new Map(); // showtimeId → Set<seatId>
+const trackedLocks = new Map();
 function startSeatExpiryWatcher() {
-    // Mỗi 10 giây, kiểm tra các ghế đang được track có còn lock không
     setInterval(async () => {
         try {
             for (const [showtimeId, seatIds] of trackedLocks.entries()) {
@@ -106,7 +132,6 @@ function startSeatExpiryWatcher() {
                 for (const seatId of seatIds) {
                     const owner = await (0, redis_1.getSeatLockOwner)(showtimeId, seatId);
                     if (!owner) {
-                        // Ghế đã hết TTL (hoặc bị unlock) — emit cho tất cả
                         io.to(`showtime:${showtimeId}`).emit('seat:released', { seatId, showtimeId });
                         toRemove.push(seatId);
                     }
@@ -116,13 +141,9 @@ function startSeatExpiryWatcher() {
                     trackedLocks.delete(showtimeId);
             }
         }
-        catch (e) {
-            // Ignore watcher errors
-        }
-    }, 10000); // 10 giây một lần
+        catch (e) { }
+    }, 10000);
 }
-// Hàm này được gọi từ booking.controller khi lock ghế
-// để watcher biết cần theo dõi ghế nào
 function trackSeatLock(showtimeId, seatIds) {
     if (!trackedLocks.has(showtimeId)) {
         trackedLocks.set(showtimeId, new Set());

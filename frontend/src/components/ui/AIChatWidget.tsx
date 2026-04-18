@@ -145,7 +145,7 @@ Hướng dẫn:
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         ) : (
-          <span className="text-2xl">✨</span>
+          <span className="text-2xl">🤖</span>
         )}
       </button>
 

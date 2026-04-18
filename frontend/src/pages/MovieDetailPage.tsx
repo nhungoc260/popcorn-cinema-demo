@@ -64,7 +64,13 @@ export default function MovieDetailPage() {
   const getEmbedUrl = (url: string) => {
     if (!url) return ''
     const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/)
-    return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=1` : url
+    if (!match) return url
+    const params = new URLSearchParams({
+      autoplay: '1',
+      rel: '0',
+      origin: window.location.origin,
+    })
+    return `https://www.youtube.com/embed/${match[1]}?${params.toString()}`
   }
 
   const handleBooking = (showtimeId: string) => {
@@ -439,7 +445,8 @@ export default function MovieDetailPage() {
               <iframe
                 src={getEmbedUrl(movie.trailer)}
                 className="absolute inset-0 w-full h-full"
-                allow="autoplay; encrypted-media"
+                allow="autoplay; encrypted-media; fullscreen"
+                referrerPolicy="strict-origin-when-cross-origin"
                 allowFullScreen
               />
             </div>

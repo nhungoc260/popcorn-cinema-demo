@@ -11,7 +11,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const redis_1 = require("../config/redis");
 let io;
 const groupRooms = new Map();
-const ROOM_TTL_MS = 30 * 60 * 1000; // 30 phút
+const ROOM_TTL_MS = 30 * 60 * 1000;
 function initSocket(server) {
     io = new socket_io_1.Server(server, {
         cors: {
@@ -21,7 +21,6 @@ function initSocket(server) {
         },
         pingTimeout: 60000,
     });
-    // 🔐 AUTH
     io.use((socket, next) => {
         const token = socket.handshake.auth.token;
         if (!token)
@@ -48,7 +47,7 @@ function initSocket(server) {
         socket.on('leave:showtime', (showtimeId) => {
             socket.leave(`showtime:${showtimeId}`);
         });
-        // ── Seat locking ─────────────────────────────
+        // Seat locking
         socket.on('seat:select', async ({ showtimeId, seatId }) => {
             try {
                 const locked = await (0, redis_1.lockSeat)(showtimeId, seatId, userId);
@@ -83,8 +82,7 @@ function initSocket(server) {
             }
             catch { }
         });
-        // ── GROUP BOOKING ─────────────────────────────
-        // ✅ CREATE ROOM
+        // GROUP BOOKING
         socket.on('group:create', ({ showtimeId, user }) => {
             const roomId = `group_${showtimeId}_${Date.now()}`;
             console.log('🆕 CREATE ROOM:', roomId, userId);
@@ -100,7 +98,6 @@ function initSocket(server) {
                 hostUserId: userId
             });
         });
-        // ✅ JOIN ROOM (FIX CHÍNH Ở ĐÂY)
         socket.on('group:join', ({ roomId, user }) => {
             console.log('🚀 JOIN REQUEST:', roomId, userId);
             if (!groupRooms.has(roomId)) {
@@ -112,7 +109,6 @@ function initSocket(server) {
                 return;
             }
             const room = groupRooms.get(roomId);
-            // ⏰ Check TTL
             if (Date.now() - room.createdAt > ROOM_TTL_MS) {
                 console.log('⏰ ROOM EXPIRED:', roomId);
                 groupRooms.delete(roomId);
@@ -122,7 +118,6 @@ function initSocket(server) {
                 });
                 return;
             }
-            // ✅ ADD MEMBER
             room.members.set(userId, user);
             socket.join(roomId);
             const members = [...room.members.values()];
@@ -137,7 +132,6 @@ function initSocket(server) {
                 hostUserId: room.hostUserId
             });
         });
-        // ✅ KICK
         socket.on('group:kick', ({ roomId, targetUserId }) => {
             const room = groupRooms.get(roomId);
             if (!room || room.hostUserId !== userId)
@@ -152,11 +146,23 @@ function initSocket(server) {
                 hostUserId: room.hostUserId
             });
         });
-        // Hover realtime
+        // ✅ HOST CHỐT ĐƠN — chỉ host mới được emit, broadcast cho tất cả member
+        socket.on('group:checkout', ({ roomId }) => {
+            const room = groupRooms.get(roomId);
+            if (!room)
+                return;
+            if (room.hostUserId !== userId) {
+                // Không phải host → bỏ qua, không làm gì
+                console.log('⛔ Non-host tried to checkout:', userId);
+                return;
+            }
+            console.log('✅ HOST CHECKOUT:', roomId, userId);
+            // Thông báo tất cả member (trừ host) biết host đã chốt
+            socket.to(roomId).emit('group:checkout', { roomId });
+        });
         socket.on('group:seat:hover', ({ roomId, seatId, user }) => {
             socket.to(roomId).emit('group:seat:hover', { seatId, user });
         });
-        // Leave
         socket.on('group:leave', ({ roomId }) => {
             if (groupRooms.has(roomId)) {
                 const room = groupRooms.get(roomId);
@@ -172,7 +178,6 @@ function initSocket(server) {
             }
             socket.leave(roomId);
         });
-        // Disconnect
         socket.on('disconnect', () => {
             console.log('❌ DISCONNECT:', userId);
             for (const [roomId, room] of groupRooms.entries()) {
@@ -190,7 +195,6 @@ function initSocket(server) {
             }
         });
     });
-    // 🧹 CLEANUP ROOM
     setInterval(() => {
         const now = Date.now();
         for (const [roomId, room] of groupRooms.entries()) {
@@ -208,7 +212,6 @@ function initSocket(server) {
     console.log('✅ Socket.io initialized');
     return io;
 }
-// ── Seat watcher ─────────────────────────────
 const trackedLocks = new Map();
 function startSeatExpiryWatcher() {
     setInterval(async () => {

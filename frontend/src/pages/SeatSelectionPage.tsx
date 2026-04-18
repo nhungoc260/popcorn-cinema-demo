@@ -27,7 +27,7 @@ export default function SeatSelectionPage() {
   const {
     members, isInGroup, isHost, hostUserId,
     createRoom, leaveRoom, kickMember,
-    getShareLink,
+    getShareLink, triggerCheckout,
   } = useGroupBooking(showtimeId || '')
 
   const { selectSeat, deselectSeat } = useShowtimeSocket(
@@ -83,6 +83,12 @@ export default function SeatSelectionPage() {
   const handleCreateRoom = async () => {
     await createRoom()
     setShowShareModal(true)
+  }
+
+  // Host nhấn "Chốt đơn nhóm": thông báo member → tạo booking → navigate
+  const handleHostCheckout = () => {
+    triggerCheckout()
+    createBookingMutation.mutate()
   }
 
   const showtime = stData?.data?.data
@@ -158,7 +164,6 @@ export default function SeatSelectionPage() {
                   </button>
                 ) : (
                   <div className="flex items-center gap-3 flex-wrap">
-                    {/* Avatars */}
                     <div className="flex -space-x-2">
                       {members?.map((m, i) => (
                         <div key={m.userId} title={`${m.name}${m.userId === hostUserId ? ' 👑' : ''}`}
@@ -169,7 +174,10 @@ export default function SeatSelectionPage() {
                       ))}
                     </div>
                     <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      {members?.length || 0} người · {isHost ? <span style={{ color: '#F59E0B' }}>👑 Bạn là host</span> : 'đang chọn'}
+                      {members?.length || 0} người ·{' '}
+                      {isHost
+                        ? <span style={{ color: '#F59E0B' }}>👑 Bạn là host</span>
+                        : 'đang chọn'}
                     </span>
                     <button onClick={() => setShowShareModal(true)}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold"
@@ -234,15 +242,29 @@ export default function SeatSelectionPage() {
                 </>
               )}
 
-              <button
-                onClick={() => createBookingMutation.mutate()}
-                disabled={selectedSeatIds.length === 0 || createBookingMutation.isPending}
-                className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {createBookingMutation.isPending
-                  ? <span className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
-                  : <>Tiếp Tục <ArrowRight className="w-4 h-4" /></>}
-              </button>
+              {/* ✅ PHÂN QUYỀN NÚT: host vs member vs cá nhân */}
+              {isInGroup && !isHost ? (
+                // Member: chỉ xem, chờ host chốt
+                <div className="w-full py-3.5 rounded-xl text-sm text-center"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.4)' }}>
+                  ⏳ Chờ host chốt đơn...
+                </div>
+              ) : (
+                // Host hoặc đặt cá nhân
+                <button
+                  onClick={isHost ? handleHostCheckout : () => createBookingMutation.mutate()}
+                  disabled={selectedSeatIds.length === 0 || createBookingMutation.isPending}
+                  className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {createBookingMutation.isPending
+                    ? <span className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+                    : isHost
+                      ? <>👑 Chốt đơn nhóm <ArrowRight className="w-4 h-4" /></>
+                      : <>Tiếp Tục <ArrowRight className="w-4 h-4" /></>
+                  }
+                </button>
+              )}
+
               <p className="text-xs text-center" style={{ color: 'var(--color-text-dim)' }}>
                 ⏱ Ghế được giữ trong 5 phút sau khi chọn
               </p>
@@ -251,7 +273,7 @@ export default function SeatSelectionPage() {
         </div>
       </div>
 
-      {/* Share Modal — host có thể kick từ đây */}
+      {/* Share Modal */}
       <AnimatePresence>
         {showShareModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -268,7 +290,6 @@ export default function SeatSelectionPage() {
                 Chia sẻ link này cho bạn bè để cùng chọn ghế realtime!
               </p>
 
-              {/* Link share */}
               <div className="flex gap-2 mb-5">
                 <input readOnly value={getShareLink()}
                   className="flex-1 min-w-0 rounded-xl px-3 py-2.5 text-xs outline-none"
@@ -280,7 +301,6 @@ export default function SeatSelectionPage() {
                 </button>
               </div>
 
-              {/* Danh sách thành viên + host có thể kick */}
               {(members?.length || 0) > 0 && (
                 <div className="mb-4 space-y-2">
                   <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
@@ -302,7 +322,6 @@ export default function SeatSelectionPage() {
                           </span>
                         )}
                       </div>
-                      {/* Host thấy nút kick người khác */}
                       {isHost && m.userId !== hostUserId && (
                         <button
                           onClick={() => kickMember(m.userId)}

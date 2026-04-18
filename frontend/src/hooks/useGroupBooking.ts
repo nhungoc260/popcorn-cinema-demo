@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useSocket } from './useSocket'
 import { useAuthStore } from '../store/authStore'
 import toast from 'react-hot-toast'
@@ -13,7 +12,6 @@ export interface GroupMember {
 export function useGroupBooking(showtimeId: string) {
   const socket = useSocket()
   const { user } = useAuthStore()
-  const navigate = useNavigate()
 
   const [roomId, setRoomId] = useState<string | null>(null)
   const [members, setMembers] = useState<GroupMember[]>([])
@@ -43,7 +41,7 @@ export function useGroupBooking(showtimeId: string) {
     }
   }, [showtimeId])
 
-  // 🔥 AUTO JOIN
+  // AUTO JOIN
   useEffect(() => {
     if (!socket || !user) return
 
@@ -80,37 +78,26 @@ export function useGroupBooking(showtimeId: string) {
     tryJoin()
 
     const interval = setInterval(() => {
-      if (!hasJoinedRoomRef.current) {
-        tryJoin()
-      }
+      if (!hasJoinedRoomRef.current) tryJoin()
     }, 1000)
 
-    return () => {
-      clearInterval(interval)
-    }
+    return () => clearInterval(interval)
   }, [socket, user, showtimeId])
 
-  // 🔥 RECONNECT FIX
+  // RECONNECT
   useEffect(() => {
     if (!socket || !roomId) return
 
     const handleReconnect = () => {
-      socket.emit('group:join', {
-        roomId,
-        user: userInfoRef.current
-      })
-
+      socket.emit('group:join', { roomId, user: userInfoRef.current })
       socket.emit('join:showtime', showtimeId)
     }
 
     socket.on('connect', handleReconnect)
-
-    return () => {
-      socket.off('connect', handleReconnect)
-    }
+    return () => { socket.off('connect', handleReconnect) }
   }, [socket, roomId, showtimeId])
 
-  // 🎧 EVENTS
+  // EVENTS
   useEffect(() => {
     if (!socket) return
 
@@ -156,12 +143,21 @@ export function useGroupBooking(showtimeId: string) {
       hasJoinedRoomRef.current = null
     }
 
+    // Host chốt đơn → member nhận thông báo chờ
+    const onCheckout = () => {
+      toast('👑 Host đã chốt đơn! Vui lòng chờ xác nhận thanh toán...', {
+        duration: 6000,
+        icon: '🎬',
+      })
+    }
+
     socket.on('group:created', onCreated)
     socket.on('group:joined', onJoined)
     socket.on('group:members', onMembers)
     socket.on('group:kicked', onKicked)
     socket.on('group:error', onError)
     socket.on('disconnect', onDisconnect)
+    socket.on('group:checkout', onCheckout)
 
     return () => {
       socket.off('group:created', onCreated)
@@ -170,6 +166,7 @@ export function useGroupBooking(showtimeId: string) {
       socket.off('group:kicked', onKicked)
       socket.off('group:error', onError)
       socket.off('disconnect', onDisconnect)
+      socket.off('group:checkout', onCheckout)
     }
   }, [socket])
 
@@ -183,9 +180,7 @@ export function useGroupBooking(showtimeId: string) {
 
   const leaveRoom = useCallback(() => {
     if (!socket || !roomId) return
-
     socket.emit('group:leave', { roomId })
-
     setRoomId(null)
     setMembers([])
     setIsInGroup(false)
@@ -208,6 +203,12 @@ export function useGroupBooking(showtimeId: string) {
     socket.emit('group:seat:hover', { roomId, seatId, user: userInfoRef.current })
   }, [socket, roomId])
 
+  // Host emit lệnh chốt đơn cho tất cả member
+  const triggerCheckout = useCallback(() => {
+    if (!socket || !roomId || !isHost) return
+    socket.emit('group:checkout', { roomId })
+  }, [socket, roomId, isHost])
+
   return {
     roomId,
     members,
@@ -219,5 +220,6 @@ export function useGroupBooking(showtimeId: string) {
     kickMember,
     getShareLink,
     emitHover,
+    triggerCheckout,
   }
 }

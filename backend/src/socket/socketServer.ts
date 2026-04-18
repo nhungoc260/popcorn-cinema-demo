@@ -12,7 +12,7 @@ interface GroupRoom {
 }
 
 const groupRooms = new Map<string, GroupRoom>()
-const ROOM_TTL_MS = 30 * 60 * 1000 // 30 phút
+const ROOM_TTL_MS = 30 * 60 * 1000
 
 export function initSocket(server: http.Server) {
   io = new Server(server, {
@@ -24,7 +24,6 @@ export function initSocket(server: http.Server) {
     pingTimeout: 60000,
   });
 
-  // 🔐 AUTH
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error('Authentication required'));
@@ -56,7 +55,7 @@ export function initSocket(server: http.Server) {
       socket.leave(`showtime:${showtimeId}`)
     })
 
-    // ── Seat locking ─────────────────────────────
+    // Seat locking
     socket.on('seat:select', async ({ showtimeId, seatId }: { showtimeId: string; seatId: string }) => {
       try {
         const locked = await lockSeat(showtimeId, seatId, userId);
@@ -90,9 +89,8 @@ export function initSocket(server: http.Server) {
       } catch {}
     });
 
-    // ── GROUP BOOKING ─────────────────────────────
+    // GROUP BOOKING
 
-    // ✅ CREATE ROOM
     socket.on('group:create', ({ showtimeId, user }: { showtimeId: string; user: any }) => {
       const roomId = `group_${showtimeId}_${Date.now()}`
 
@@ -113,7 +111,6 @@ export function initSocket(server: http.Server) {
       })
     })
 
-    // ✅ JOIN ROOM (FIX CHÍNH Ở ĐÂY)
     socket.on('group:join', ({ roomId, user }: { roomId: string; user: any }) => {
       console.log('🚀 JOIN REQUEST:', roomId, userId)
 
@@ -128,11 +125,9 @@ export function initSocket(server: http.Server) {
 
       const room = groupRooms.get(roomId)!
 
-      // ⏰ Check TTL
       if (Date.now() - room.createdAt > ROOM_TTL_MS) {
         console.log('⏰ ROOM EXPIRED:', roomId)
         groupRooms.delete(roomId)
-
         socket.emit('group:error', {
           code: 'ROOM_EXPIRED',
           message: 'Link đặt vé nhóm đã hết hạn (30 phút)'
@@ -140,9 +135,7 @@ export function initSocket(server: http.Server) {
         return
       }
 
-      // ✅ ADD MEMBER
       room.members.set(userId, user)
-
       socket.join(roomId)
 
       const members = [...room.members.values()]
@@ -161,7 +154,6 @@ export function initSocket(server: http.Server) {
       })
     })
 
-    // ✅ KICK
     socket.on('group:kick', ({ roomId, targetUserId }: { roomId: string; targetUserId: string }) => {
       const room = groupRooms.get(roomId)
       if (!room || room.hostUserId !== userId) return
@@ -172,19 +164,33 @@ export function initSocket(server: http.Server) {
       const members = [...room.members.values()]
 
       io.to(`user:${targetUserId}`).emit('group:kicked', { roomId })
-
       io.to(roomId).emit('group:members', {
         members,
         hostUserId: room.hostUserId
       })
     })
 
-    // Hover realtime
+    // ✅ HOST CHỐT ĐƠN — chỉ host mới được emit, broadcast cho tất cả member
+    socket.on('group:checkout', ({ roomId }: { roomId: string }) => {
+      const room = groupRooms.get(roomId)
+
+      if (!room) return
+      if (room.hostUserId !== userId) {
+        // Không phải host → bỏ qua, không làm gì
+        console.log('⛔ Non-host tried to checkout:', userId)
+        return
+      }
+
+      console.log('✅ HOST CHECKOUT:', roomId, userId)
+
+      // Thông báo tất cả member (trừ host) biết host đã chốt
+      socket.to(roomId).emit('group:checkout', { roomId })
+    })
+
     socket.on('group:seat:hover', ({ roomId, seatId, user }: any) => {
       socket.to(roomId).emit('group:seat:hover', { seatId, user })
     })
 
-    // Leave
     socket.on('group:leave', ({ roomId }: { roomId: string }) => {
       if (groupRooms.has(roomId)) {
         const room = groupRooms.get(roomId)!
@@ -206,7 +212,6 @@ export function initSocket(server: http.Server) {
       socket.leave(roomId)
     })
 
-    // Disconnect
     socket.on('disconnect', () => {
       console.log('❌ DISCONNECT:', userId)
 
@@ -229,19 +234,16 @@ export function initSocket(server: http.Server) {
     });
   });
 
-  // 🧹 CLEANUP ROOM
   setInterval(() => {
     const now = Date.now()
 
     for (const [roomId, room] of groupRooms.entries()) {
       if (now - room.createdAt > ROOM_TTL_MS) {
         console.log('🧹 CLEAN ROOM:', roomId)
-
         io.to(roomId).emit('group:error', {
           code: 'ROOM_EXPIRED',
           message: 'Phòng đặt vé đã hết hạn'
         })
-
         groupRooms.delete(roomId)
       }
     }
@@ -252,8 +254,6 @@ export function initSocket(server: http.Server) {
   console.log('✅ Socket.io initialized');
   return io;
 }
-
-// ── Seat watcher ─────────────────────────────
 
 const trackedLocks = new Map<string, Set<string>>();
 
@@ -271,7 +271,6 @@ function startSeatExpiryWatcher() {
               seatId,
               showtimeId
             })
-
             toRemove.push(seatId);
           }
         }
@@ -290,7 +289,6 @@ export function trackSeatLock(showtimeId: string, seatIds: string[]) {
   if (!trackedLocks.has(showtimeId)) {
     trackedLocks.set(showtimeId, new Set());
   }
-
   seatIds.forEach(id => trackedLocks.get(showtimeId)!.add(id));
 }
 

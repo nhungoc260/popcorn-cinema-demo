@@ -22,9 +22,11 @@ Hướng dẫn:
 
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    const history = messages.slice(0, -1).map((m: any) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
+    const history = messages.slice(0, -1)
+    .filter((_: any, i: number) => i > 0) // bỏ tin nhắn đầu tiên (lời chào của assistant)
+    .map((m: any) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
     }));
 
     const chat = model.startChat({

@@ -80,22 +80,20 @@ Hướng dẫn:
 - Nếu khách hỏi về suất chiếu, giá vé, hãy hướng dẫn họ bấm nút "Đặt vé" 
 - Giữ câu trả lời ngắn gọn, dưới 200 từ`
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/v1/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          system: systemPrompt,
-          messages: [
+            messages: [
             ...history,
             { role: 'user', content: userMsg }
-          ],
+            ],
+            movies: movieList,
         }),
-      })
+        })
 
-      const data = await response.json()
-      const text = data.content?.[0]?.text || 'Xin lỗi, mình không hiểu. Bạn có thể nói rõ hơn không?'
+        const data = await response.json()
+        const text = data.data?.text || 'Xin lỗi, mình không hiểu. Bạn có thể nói rõ hơn không?'
 
       // Extract movie IDs from response
       const movieIdMatches = text.matchAll(/\[PHIM_ID:([a-f0-9]+)\]/g)

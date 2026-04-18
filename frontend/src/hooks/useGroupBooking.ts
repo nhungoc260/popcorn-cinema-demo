@@ -15,29 +15,43 @@ export function useGroupBooking(showtimeId: string) {
   const [members, setMembers] = useState<GroupMember[]>([])
   const [isInGroup, setIsInGroup] = useState(false)
 
-  // Fix: dùng user?.id thay vì user?._id
   const userInfo = {
     userId: user?.id || '',
     name: user?.name || 'Khách',
     avatar: user?.avatar || '',
   }
 
+  // Bug 2 fix: đợi socket connect xong mới join room từ URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const urlRoomId = params.get('groupRoom')
-    if (urlRoomId && socket && user) {
+    if (!urlRoomId || !socket || !user) return
+
+    const doJoin = () => {
       socket.emit('group:join', { roomId: urlRoomId, user: userInfo })
       setRoomId(urlRoomId)
       setIsInGroup(true)
+    }
+
+    if (socket.connected) {
+      doJoin()
+    } else {
+      socket.once('connect', doJoin)
+    }
+
+    return () => {
+      socket.off('connect', doJoin)
     }
   }, [socket, user])
 
   useEffect(() => {
     if (!socket) return
 
+    // Bug 3 fix: set member đầu tiên (chính mình) ngay khi tạo phòng
     socket.on('group:created', ({ roomId }: { roomId: string }) => {
       setRoomId(roomId)
       setIsInGroup(true)
+      setMembers([userInfo])
     })
 
     socket.on('group:joined', ({ roomId, members }: { roomId: string; members: GroupMember[] }) => {
@@ -75,9 +89,10 @@ export function useGroupBooking(showtimeId: string) {
     setIsInGroup(false)
   }, [socket, roomId])
 
+  // Bug 1 fix: dùng /seats/ thay vì /seat-selection/ cho đúng với route thực tế
   const getShareLink = useCallback(() => {
     if (!roomId) return ''
-    return `${window.location.origin}/seat-selection/${showtimeId}?groupRoom=${roomId}`
+    return `${window.location.origin}/seats/${showtimeId}?groupRoom=${roomId}`
   }, [roomId, showtimeId])
 
   const emitHover = useCallback((seatId: string) => {

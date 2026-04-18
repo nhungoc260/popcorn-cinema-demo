@@ -18,7 +18,6 @@ interface MovieSuggestion {
   status: string
 }
 
-// Render markdown đơn giản: **chữ** → <strong>
 function renderMarkdown(text: string) {
   const parts = text.split(/\*\*(.*?)\*\*/g)
   return parts.map((part, i) =>
@@ -84,21 +83,16 @@ export default function AIChatWidget() {
       const data = await response.json()
       const text = data.data?.text || 'Xin lỗi, mình không hiểu. Bạn có thể nói rõ hơn không?'
 
-      // Match PHIM_ID từ response
       const movieIdMatches = [...text.matchAll(/\[PHIM_ID:\s*["']?([a-f0-9]+)["']?\s*\]/g)]
       const suggestedIds = movieIdMatches.map((m: any) => m[1])
 
-      // Match theo ID trước, nếu không có thì match theo title trong text
       let suggestedMovies = movies.filter(m => suggestedIds.includes(m._id))
-
-      // Fallback: nếu không match được ID, tìm tên phim trong text
       if (suggestedMovies.length === 0) {
         suggestedMovies = movies.filter(m =>
           text.toUpperCase().includes(m.title.toUpperCase())
         ).slice(0, 3)
       }
 
-      // Xóa tag PHIM_ID khỏi text hiển thị
       const cleanText = text.replace(/\[PHIM_ID:\s*["']?[a-f0-9]+["']?\s*\]/g, '').trim()
 
       setMessages(prev => [...prev, {
@@ -136,7 +130,6 @@ export default function AIChatWidget() {
           background: 'linear-gradient(135deg, #A855F7, #7C3AED)',
           boxShadow: '0 8px 32px rgba(168,85,247,0.5)',
         }}
-        title="PopBot - AI tư vấn phim"
       >
         {open ? (
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -149,19 +142,21 @@ export default function AIChatWidget() {
 
       {open && (
         <div
-          className="fixed bottom-24 right-0 left-0 mx-3 sm:left-auto sm:right-6 sm:w-96 z-50 rounded-2xl overflow-hidden flex flex-col"
+          className="fixed bottom-24 right-0 left-0 mx-3 sm:left-auto sm:right-6 sm:w-96 z-50 rounded-2xl flex flex-col"
           style={{
             height: '560px',
             background: 'linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%)',
             border: '1px solid rgba(168,85,247,0.25)',
-            boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(168,85,247,0.08), inset 0 1px 0 rgba(255,255,255,0.05)',
+            boxShadow: '0 24px 80px rgba(0,0,0,0.7)',
+            overflow: 'hidden',
           }}
         >
           {/* Header */}
-          <div className="relative p-4 flex items-center gap-3 overflow-hidden"
+          <div className="relative p-4 flex items-center gap-3 flex-shrink-0"
             style={{
               background: 'linear-gradient(135deg, rgba(168,85,247,0.25) 0%, rgba(124,58,237,0.15) 100%)',
               borderBottom: '1px solid rgba(168,85,247,0.2)',
+              overflow: 'hidden',
             }}>
             <div className="absolute -top-4 -left-4 w-24 h-24 rounded-full opacity-20"
               style={{ background: 'radial-gradient(circle, #A855F7, transparent)' }} />
@@ -169,7 +164,7 @@ export default function AIChatWidget() {
               style={{ background: 'linear-gradient(135deg, #A855F7, #7C3AED)', boxShadow: '0 4px 12px rgba(168,85,247,0.4)' }}>
               🤖
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <div className="font-bold text-sm tracking-wide" style={{ color: '#fff' }}>PopBot</div>
               <div className="text-xs flex items-center gap-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" style={{ boxShadow: '0 0 6px #4ade80' }}></span>
@@ -178,7 +173,7 @@ export default function AIChatWidget() {
             </div>
             <button
               onClick={() => setOpen(false)}
-              className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-white/10"
+              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors hover:bg-white/10"
               style={{ color: 'rgba(255,255,255,0.4)' }}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -213,11 +208,9 @@ export default function AIChatWidget() {
                       borderBottomLeftRadius: 4,
                     }}
                   >
-                    {/* Render markdown **chữ** → bold */}
                     {renderMarkdown(msg.content)}
                   </div>
 
-                  {/* Card phim */}
                   {msg.movies && msg.movies.length > 0 && (
                     <div className="mt-2 space-y-2">
                       {msg.movies.map(movie => (
@@ -286,20 +279,19 @@ export default function AIChatWidget() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
-          <div className="p-3"
+          {/* Input - flex-shrink-0 để không bị co lại */}
+          <div className="flex-shrink-0 px-3 pt-3 pb-4"
             style={{
               borderTop: '1px solid rgba(168,85,247,0.15)',
               background: 'rgba(0,0,0,0.3)',
-              backdropFilter: 'blur(10px)',
             }}>
-            <div className="flex gap-2 items-center w-full">
+            <div className="flex gap-2 items-center">
               <input
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                 placeholder="Nhắn tin với PopBot..."
-                className="flex-1 min-w-0 rounded-xl px-3 py-2.5 text-sm outline-none transition-all"
+                className="flex-1 min-w-0 rounded-xl px-3 py-2.5 text-sm outline-none"
                 style={{
                   background: 'rgba(255,255,255,0.06)',
                   border: '1px solid rgba(168,85,247,0.2)',
@@ -310,7 +302,7 @@ export default function AIChatWidget() {
               <button
                 onClick={sendMessage}
                 disabled={loading || !input.trim()}
-                className="w-10 h-10 rounded-xl flex items-center justify-center transition-all disabled:opacity-40 hover:scale-105"
+                className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all disabled:opacity-40"
                 style={{
                   background: 'linear-gradient(135deg, #A855F7, #7C3AED)',
                   boxShadow: '0 4px 12px rgba(168,85,247,0.4)',

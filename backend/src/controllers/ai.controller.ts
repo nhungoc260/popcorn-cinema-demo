@@ -38,6 +38,7 @@ Hướng dẫn:
 
     return res.json({ success: true, data: { text } });
   } catch (err: any) {
+    console.error('AI Chat Error:', err.message, err.stack);
     return res.status(500).json({ success: false, message: err.message });
   }
 }

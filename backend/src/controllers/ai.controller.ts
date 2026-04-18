@@ -20,27 +20,30 @@ Hướng dẫn:
 - Cuối mỗi gợi ý phim, thêm: [PHIM_ID:{id}]
 - Ngắn gọn dưới 200 từ`;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-    const history = messages.slice(0, -1)
-    .filter((_: any, i: number) => i > 0) // bỏ tin nhắn đầu tiên (lời chào của assistant)
-    .map((m: any) => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }],
-    }));
-
-    const chat = model.startChat({
-      history,
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
       systemInstruction: systemPrompt,
     });
 
-    const lastMessage = messages[messages.length - 1].content;
-    const result = await chat.sendMessage(lastMessage);
-    const text = result.response.text();
+    // Chỉ lấy các cặp user-model, bỏ tin chào đầu tiên
+    const allPrev = messages.slice(0, -1)
+    const history: any[] = []
+    for (const m of allPrev) {
+      if (m.role === 'user') {
+        history.push({ role: 'user', parts: [{ text: m.content }] })
+      } else if (m.role === 'assistant' && history.length > 0) {
+        history.push({ role: 'model', parts: [{ text: m.content }] })
+      }
+    }
 
-    return res.json({ success: true, data: { text } });
+    const chat = model.startChat({ history })
+    const lastMessage = messages[messages.length - 1].content
+    const result = await chat.sendMessage(lastMessage)
+    const text = result.response.text()
+
+    return res.json({ success: true, data: { text } })
   } catch (err: any) {
-    console.error('AI Chat Error:', err.message, err.stack);
-    return res.status(500).json({ success: false, message: err.message });
+    console.error('AI Chat Error:', err.message)
+    return res.status(500).json({ success: false, message: err.message })
   }
 }

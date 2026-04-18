@@ -57,13 +57,13 @@ app.use(`${API}/users`, user_routes_1.default);
 app.use(`${API}/movies/:movieId/reviews`, review_routes_1.default);
 app.use(`${API}/coupons`, coupon_routes_1.default);
 app.use(`${API}/reports`, report_routes_1.default);
+app.use(`${API}/ai`, ai_routes_1.default);
 app.get('/health', (_, res) => res.json({ status: 'ok', time: new Date() }));
 app.use(express_1.default.static(path_1.default.join(process.cwd(), 'public')));
 app.get('*', (_, res) => {
     res.sendFile(path_1.default.join(process.cwd(), 'public', 'index.html'));
 });
 app.use(errorHandler_1.errorHandler);
-app.use(`${API}/ai`, ai_routes_1.default);
 const PORT = process.env.PORT || 5000;
 async function bootstrap() {
     try {

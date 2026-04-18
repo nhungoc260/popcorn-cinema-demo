@@ -56,14 +56,13 @@ app.use(`${API}/users`, userRoutes);
 app.use(`${API}/movies/:movieId/reviews`, reviewRoutes);
 app.use(`${API}/coupons`, couponRoutes);
 app.use(`${API}/reports`, reportRoutes);
+app.use(`${API}/ai`, aiRoutes);
 app.get('/health', (_, res) => res.json({ status: 'ok', time: new Date() }));
 app.use(express.static(path.join(process.cwd(), 'public')));
 app.get('*', (_, res) => {
   res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
 });
 app.use(errorHandler);
-app.use(`${API}/ai`, aiRoutes);
-
 
 const PORT = process.env.PORT || 5000;
 

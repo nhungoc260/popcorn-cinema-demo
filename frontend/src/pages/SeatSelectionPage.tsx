@@ -82,7 +82,7 @@ export default function SeatSelectionPage() {
 
   const handleCreateRoom = () => {
     createRoom()
-    setShowShareModal(true)
+    setTimeout(() => setShowShareModal(true), 500)
   }
 
   const showtime = stData?.data?.data

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
 
 export async function aiChat(req: Request, res: Response) {
   try {
@@ -20,30 +20,29 @@ Hướng dẫn:
 - Cuối mỗi gợi ý phim, thêm: [PHIM_ID:{id}]
 - Ngắn gọn dưới 200 từ`;
 
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.0-flash',
-      systemInstruction: systemPrompt,
+    // Chuyển messages sang format Groq (giống OpenAI)
+    const history = messages.slice(0, -1).map((m: any) => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content,
+    }));
+
+    const lastMessage = messages[messages.length - 1].content;
+
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...history,
+        { role: 'user', content: lastMessage },
+      ],
+      max_tokens: 500,
     });
 
-    // Chỉ lấy các cặp user-model, bỏ tin chào đầu tiên
-    const allPrev = messages.slice(0, -1)
-    const history: any[] = []
-    for (const m of allPrev) {
-      if (m.role === 'user') {
-        history.push({ role: 'user', parts: [{ text: m.content }] })
-      } else if (m.role === 'assistant' && history.length > 0) {
-        history.push({ role: 'model', parts: [{ text: m.content }] })
-      }
-    }
+    const text = completion.choices[0].message.content || '';
 
-    const chat = model.startChat({ history })
-    const lastMessage = messages[messages.length - 1].content
-    const result = await chat.sendMessage(lastMessage)
-    const text = result.response.text()
-
-    return res.json({ success: true, data: { text } })
+    return res.json({ success: true, data: { text } });
   } catch (err: any) {
-    console.error('AI Chat Error:', err.message)
-    return res.status(500).json({ success: false, message: err.message })
+    console.error('AI Chat Error:', err.message);
+    return res.status(500).json({ success: false, message: err.message });
   }
 }

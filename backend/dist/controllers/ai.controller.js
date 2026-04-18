@@ -1,8 +1,11 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.aiChat = aiChat;
-const generative_ai_1 = require("@google/generative-ai");
-const genAI = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const groq_sdk_1 = __importDefault(require("groq-sdk"));
+const groq = new groq_sdk_1.default({ apiKey: process.env.GROQ_API_KEY || '' });
 async function aiChat(req, res) {
     try {
         const { messages, movies } = req.body;
@@ -18,25 +21,22 @@ Hướng dẫn:
 - Giải thích tại sao phim đó phù hợp
 - Cuối mỗi gợi ý phim, thêm: [PHIM_ID:{id}]
 - Ngắn gọn dưới 200 từ`;
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash',
-            systemInstruction: systemPrompt,
-        });
-        // Chỉ lấy các cặp user-model, bỏ tin chào đầu tiên
-        const allPrev = messages.slice(0, -1);
-        const history = [];
-        for (const m of allPrev) {
-            if (m.role === 'user') {
-                history.push({ role: 'user', parts: [{ text: m.content }] });
-            }
-            else if (m.role === 'assistant' && history.length > 0) {
-                history.push({ role: 'model', parts: [{ text: m.content }] });
-            }
-        }
-        const chat = model.startChat({ history });
+        // Chuyển messages sang format Groq (giống OpenAI)
+        const history = messages.slice(0, -1).map((m) => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: m.content,
+        }));
         const lastMessage = messages[messages.length - 1].content;
-        const result = await chat.sendMessage(lastMessage);
-        const text = result.response.text();
+        const completion = await groq.chat.completions.create({
+            model: 'llama-3.1-8b-instant',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                ...history,
+                { role: 'user', content: lastMessage },
+            ],
+            max_tokens: 500,
+        });
+        const text = completion.choices[0].message.content || '';
         return res.json({ success: true, data: { text } });
     }
     catch (err) {

@@ -20,6 +20,7 @@ export default function SeatSelectionPage() {
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([])
   const [selectedSeatObjs, setSelectedSeatObjs] = useState<any[]>([])
   const [showShareModal, setShowShareModal] = useState(false)
+  const [showMembersModal, setShowMembersModal] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const queryClient = useQueryClient()
@@ -51,7 +52,6 @@ export default function SeatSelectionPage() {
     refetchInterval: isInGroup ? 2000 : false,
   })
 
-  // Booking cá nhân
   const createBookingMutation = useMutation({
     mutationFn: (seatIds: string[]) => bookingApi.create(showtimeId || '', seatIds),
     onSuccess: (res) => {
@@ -85,7 +85,6 @@ export default function SeatSelectionPage() {
     setShowShareModal(true)
   }
 
-  // Host chốt đơn: server gom ghế toàn nhóm → trả về → tạo 1 booking chung
   const handleHostCheckout = () => {
     if (allGroupSeatIds.length === 0) {
       toast.error('Chưa có ai chọn ghế trong nhóm!')
@@ -99,8 +98,7 @@ export default function SeatSelectionPage() {
   const showtime = stData?.data?.data
   const seats: any[] = seatsData?.data?.data || []
 
-  // Với host trong nhóm: hiển thị ghế của toàn nhóm trong order summary
-  // member không thấy order, chỉ host mới thấy
+  // Host thấy ghế toàn nhóm, member không thấy order (chỉ chờ), cá nhân thấy ghế mình
   const displaySeats = isInGroup
     ? (isHost ? seats.filter(s => allGroupSeatIds.includes(s._id)) : [])
     : selectedSeatObjs
@@ -176,21 +174,29 @@ export default function SeatSelectionPage() {
                   </button>
                 ) : (
                   <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex -space-x-2">
+                    {/* Avatars — click để mở members modal */}
+                    <button
+                      onClick={() => setShowMembersModal(true)}
+                      className="flex -space-x-2 hover:opacity-80 transition-opacity"
+                      title="Xem danh sách thành viên">
                       {members?.map((m, i) => (
-                        <div key={m.userId} title={`${m.name}${m.userId === hostUserId ? ' 👑' : ''}`}
+                        <div key={m.userId}
                           className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold flex-shrink-0"
                           style={{ borderColor: m.userId === hostUserId ? '#F59E0B' : '#7C3AED', background: `hsl(${i * 60}, 70%, 45%)`, color: '#fff', zIndex: (members?.length || 0) - i }}>
                           {m.name.charAt(0).toUpperCase()}
                         </div>
                       ))}
-                    </div>
-                    <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                    </button>
+
+                    <button onClick={() => setShowMembersModal(true)}
+                      className="text-xs hover:opacity-80 transition-opacity"
+                      style={{ color: 'var(--color-text-muted)' }}>
                       {members?.length || 0} người ·{' '}
                       {isHost
                         ? <span style={{ color: '#F59E0B' }}>👑 Bạn là host</span>
-                        : 'đang chọn'}
-                    </span>
+                        : <span>đang chọn</span>}
+                    </button>
+
                     <button onClick={() => setShowShareModal(true)}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold"
                       style={{ background: 'rgba(168,85,247,0.15)', color: '#A855F7' }}>
@@ -234,76 +240,110 @@ export default function SeatSelectionPage() {
                 )}
               </h3>
 
-              {displaySeats.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="text-4xl mb-3">🪑</div>
-                  <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                    {isInGroup && isHost ? 'Chưa có ai chọn ghế' : 'Chưa chọn ghế nào'}
-                  </p>
-                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-dim)' }}>
-                    {isInGroup && isHost ? 'Chờ thành viên chọn ghế' : 'Nhấp vào ghế để chọn'}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    {displaySeats.map(seat => {
-                      // Tìm member đang giữ ghế này (để hiện tên)
-                      const ownerEntry = isInGroup && isHost
-                        ? Object.entries(groupSeatMap).find(([, sids]) => sids.includes(seat._id))
-                        : null
-                      const ownerMember = ownerEntry
-                        ? members.find(m => m.userId === ownerEntry[0])
-                        : null
-
-                      return (
-                        <div key={seat._id} className="flex justify-between items-center py-2"
-                          style={{ borderBottom: '1px solid var(--color-glass-border)' }}>
+              {/* Member: hiện trạng thái chờ + ghế mình đang giữ */}
+              {isInGroup && !isHost ? (
+                <div className="space-y-4">
+                  {/* Ghế mình đang giữ */}
+                  {selectedSeatObjs.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Ghế bạn đang giữ:</p>
+                      {selectedSeatObjs.map(seat => (
+                        <div key={seat._id} className="flex justify-between items-center py-1.5 px-3 rounded-lg"
+                          style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.15)' }}>
                           <div>
-                            <span className="font-mono font-bold text-sm" style={{ color: 'var(--color-primary)' }}>{seat.label}</span>
+                            <span className="font-mono font-bold text-sm" style={{ color: '#A855F7' }}>{seat.label}</span>
                             <span className="text-xs ml-2" style={{ color: 'var(--color-text-muted)' }}>{seat.type.toUpperCase()}</span>
-                            {ownerMember && (
-                              <span className="text-xs ml-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                                ({ownerMember.name})
-                              </span>
-                            )}
                           </div>
                           <span className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
                             {seat.price.toLocaleString('vi')}đ
                           </span>
                         </div>
-                      )
-                    })}
-                  </div>
-                  <div className="flex justify-between items-center pt-2">
-                    <span className="font-semibold" style={{ color: 'var(--color-text)' }}>Tổng Cộng</span>
-                    <span className="font-bold text-lg text-gradient-gold">{totalAmount.toLocaleString('vi')}đ</span>
-                  </div>
-                </>
-              )}
+                      ))}
+                    </div>
+                  )}
 
-              {/* Phân quyền nút */}
-              {isInGroup && !isHost ? (
-                <div className="w-full py-3.5 rounded-xl text-sm text-center"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.4)' }}>
-                  ⏳ Chờ host chốt đơn...
+                  {/* Trạng thái chờ */}
+                  <div className="py-4 text-center rounded-xl"
+                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.12)' }}>
+                    <div className="text-2xl mb-2">⏳</div>
+                    <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>Chờ host chốt đơn</p>
+                    <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      Host sẽ thanh toán cho cả nhóm
+                    </p>
+                  </div>
+
+                  {/* Nút chờ disabled */}
+                  <div className="w-full py-3.5 rounded-xl text-sm text-center"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.3)' }}>
+                    ⏳ Chờ host chốt đơn...
+                  </div>
                 </div>
               ) : (
-                <button
-                  onClick={isHost ? handleHostCheckout : () => createBookingMutation.mutate(selectedSeatIds)}
-                  disabled={
-                    createBookingMutation.isPending ||
-                    (isHost ? allGroupSeatIds.length === 0 : selectedSeatIds.length === 0)
-                  }
-                  className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {createBookingMutation.isPending
-                    ? <span className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
-                    : isHost
-                      ? <>👑 Chốt đơn nhóm ({allGroupSeatIds.length} ghế) <ArrowRight className="w-4 h-4" /></>
-                      : <>Tiếp Tục <ArrowRight className="w-4 h-4" /></>
-                  }
-                </button>
+                <>
+                  {/* Host hoặc cá nhân */}
+                  {displaySeats.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="text-4xl mb-3">🪑</div>
+                      <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                        {isInGroup && isHost ? 'Chưa có ai chọn ghế' : 'Chưa chọn ghế nào'}
+                      </p>
+                      <p className="text-xs mt-1" style={{ color: 'var(--color-text-dim)' }}>
+                        {isInGroup && isHost ? 'Chờ thành viên chọn ghế' : 'Nhấp vào ghế để chọn'}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        {displaySeats.map(seat => {
+                          const ownerEntry = isInGroup && isHost
+                            ? Object.entries(groupSeatMap).find(([, sids]) => sids.includes(seat._id))
+                            : null
+                          const ownerMember = ownerEntry
+                            ? members.find(m => m.userId === ownerEntry[0])
+                            : null
+
+                          return (
+                            <div key={seat._id} className="flex justify-between items-center py-2"
+                              style={{ borderBottom: '1px solid var(--color-glass-border)' }}>
+                              <div>
+                                <span className="font-mono font-bold text-sm" style={{ color: 'var(--color-primary)' }}>{seat.label}</span>
+                                <span className="text-xs ml-2" style={{ color: 'var(--color-text-muted)' }}>{seat.type.toUpperCase()}</span>
+                                {ownerMember && (
+                                  <span className="text-xs ml-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                                    ({ownerMember.name})
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+                                {seat.price.toLocaleString('vi')}đ
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div className="flex justify-between items-center pt-2">
+                        <span className="font-semibold" style={{ color: 'var(--color-text)' }}>Tổng Cộng</span>
+                        <span className="font-bold text-lg text-gradient-gold">{totalAmount.toLocaleString('vi')}đ</span>
+                      </div>
+                    </>
+                  )}
+
+                  <button
+                    onClick={isHost ? handleHostCheckout : () => createBookingMutation.mutate(selectedSeatIds)}
+                    disabled={
+                      createBookingMutation.isPending ||
+                      (isHost ? allGroupSeatIds.length === 0 : selectedSeatIds.length === 0)
+                    }
+                    className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {createBookingMutation.isPending
+                      ? <span className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+                      : isHost
+                        ? <>👑 Chốt đơn nhóm ({allGroupSeatIds.length} ghế) <ArrowRight className="w-4 h-4" /></>
+                        : <>Tiếp Tục <ArrowRight className="w-4 h-4" /></>
+                    }
+                  </button>
+                </>
               )}
 
               <p className="text-xs text-center" style={{ color: 'var(--color-text-dim)' }}>
@@ -331,7 +371,7 @@ export default function SeatSelectionPage() {
                 Chia sẻ link này cho bạn bè để cùng chọn ghế realtime!
               </p>
 
-              <div className="flex gap-2 mb-5">
+              <div className="flex gap-2 mb-4">
                 <input readOnly value={getShareLink()}
                   className="flex-1 min-w-0 rounded-xl px-3 py-2.5 text-xs outline-none"
                   style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(168,85,247,0.2)', color: '#fff' }} />
@@ -342,58 +382,124 @@ export default function SeatSelectionPage() {
                 </button>
               </div>
 
-              {(members?.length || 0) > 0 && (
-                <div className="mb-4 space-y-2">
-                  <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                    {members?.length || 0} người trong phòng:
+              {/* Nút xem danh sách thành viên */}
+              <button
+                onClick={() => { setShowShareModal(false); setShowMembersModal(true) }}
+                className="w-full py-2.5 rounded-xl text-sm mb-3 flex items-center justify-center gap-2 transition-colors hover:bg-white/10"
+                style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)' }}>
+                <Users className="w-4 h-4" />
+                Xem danh sách thành viên ({members?.length || 0} người)
+              </button>
+
+              <button onClick={() => setShowShareModal(false)}
+                className="w-full py-2.5 rounded-xl text-sm transition-colors hover:bg-white/10"
+                style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)' }}>
+                Đóng
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Members Modal — danh sách đầy đủ, host có thể kick */}
+      <AnimatePresence>
+        {showMembersModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setShowMembersModal(false)}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+              className="rounded-2xl p-6 w-full max-w-md"
+              style={{ background: '#1a1a2e', border: '1px solid rgba(168,85,247,0.3)', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}
+              onClick={e => e.stopPropagation()}>
+
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold" style={{ color: '#fff' }}>👥 Thành viên nhóm</h3>
+                  <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    {members?.length || 0} người trong phòng
                   </p>
-                  {members.map((m, i) => {
-                    const memberSeats = groupSeatMap[m.userId] || []
-                    return (
-                      <div key={m.userId}
-                        className="flex items-center justify-between px-3 py-2 rounded-xl"
-                        style={{ background: 'rgba(255,255,255,0.04)' }}>
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                </div>
+                {isHost && (
+                  <span className="text-xs px-2 py-1 rounded-lg" style={{ background: 'rgba(245,158,11,0.15)', color: '#F59E0B' }}>
+                    👑 Bạn là host
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-2 mb-4 max-h-72 overflow-y-auto">
+                {members.map((m, i) => {
+                  const memberSeatIds = groupSeatMap[m.userId] || []
+                  const memberSeatLabels = seats
+                    .filter(s => memberSeatIds.includes(s._id))
+                    .map(s => s.label)
+
+                  return (
+                    <div key={m.userId}
+                      className="rounded-xl p-3"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          {/* Avatar */}
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
                             style={{ background: `hsl(${i * 60}, 70%, 45%)`, color: '#fff' }}>
                             {m.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm" style={{ color: '#fff' }}>{m.name}</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-sm font-medium" style={{ color: '#fff' }}>{m.name}</span>
                               {m.userId === hostUserId && (
-                                <span className="text-xs px-1.5 py-0.5 rounded-md flex-shrink-0"
+                                <span className="text-xs px-1.5 py-0.5 rounded-md"
                                   style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B' }}>
                                   👑 Host
                                 </span>
                               )}
                             </div>
-                            {/* Hiện ghế member đang chọn */}
-                            {memberSeats.length > 0 && (
+                            {/* Ghế đang giữ */}
+                            {memberSeatLabels.length > 0 ? (
                               <p className="text-xs mt-0.5" style={{ color: '#A855F7' }}>
-                                Đang giữ: {seats.filter(s => memberSeats.includes(s._id)).map(s => s.label).join(', ')}
+                                Đang giữ: {memberSeatLabels.join(', ')}
+                              </p>
+                            ) : (
+                              <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                                Chưa chọn ghế
                               </p>
                             )}
                           </div>
                         </div>
+
+                        {/* Host kick button */}
                         {isHost && m.userId !== hostUserId && (
                           <button
-                            onClick={() => kickMember(m.userId)}
-                            title="Kick khỏi nhóm"
-                            className="p-1.5 rounded-lg transition-colors hover:bg-red-500/20 flex-shrink-0"
-                            style={{ color: 'rgba(248,113,113,0.6)' }}>
-                            <UserX className="w-3.5 h-3.5" />
+                            onClick={() => {
+                              kickMember(m.userId)
+                              toast.success(`Đã kick ${m.name} khỏi nhóm`)
+                            }}
+                            title={`Kick ${m.name} khỏi nhóm`}
+                            className="ml-2 p-2 rounded-lg transition-all hover:bg-red-500/20 flex-shrink-0 group"
+                            style={{ color: 'rgba(248,113,113,0.5)' }}>
+                            <UserX className="w-4 h-4 group-hover:text-red-400 transition-colors" />
                           </button>
                         )}
                       </div>
-                    )
-                  })}
-                </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Host: nút chia sẻ link thêm người */}
+              {isHost && (
+                <button
+                  onClick={() => { setShowMembersModal(false); setShowShareModal(true) }}
+                  className="w-full py-2.5 rounded-xl text-sm mb-3 flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"
+                  style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.2), rgba(124,58,237,0.2))', border: '1px solid rgba(168,85,247,0.3)', color: '#A855F7' }}>
+                  🔗 Mời thêm thành viên
+                </button>
               )}
 
-              <button onClick={() => setShowShareModal(false)}
+              <button onClick={() => setShowMembersModal(false)}
                 className="w-full py-2.5 rounded-xl text-sm transition-colors hover:bg-white/10"
-                style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>
+                style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)' }}>
                 Đóng
               </button>
             </motion.div>

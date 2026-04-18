@@ -39,55 +39,142 @@ import AdminInvoices from './pages/admin/AdminInvoices'
 import StaffCheckIn from './pages/staff/StaffCheckIn'
 import StaffCounter from './pages/staff/StaffCounter'
 
-function PrivateRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
+/* =========================
+   🔐 PRIVATE ROUTE (FIXED)
+========================= */
+function PrivateRoute({
+  children,
+  roles,
+}: {
+  children: React.ReactNode
+  roles?: string[]
+}) {
   const { user, token } = useAuthStore()
+
   if (!token) {
+    // 🔥 Lưu FULL URL (quan trọng nhất)
+    const currentUrl = window.location.pathname + window.location.search
+    localStorage.setItem('redirectAfterLogin', currentUrl)
+
+    // 🔥 backup groupRoom (optional nhưng nên có)
     const params = new URLSearchParams(window.location.search)
     const groupRoom = params.get('groupRoom')
     if (groupRoom) {
       localStorage.setItem('pendingGroupRoom', groupRoom)
     }
+
     return <Navigate to="/login" replace />
   }
-  if (roles && user && !roles.includes(user.role)) return <Navigate to="/" replace />
+
+  if (roles && user && !roles.includes(user.role)) {
+    return <Navigate to="/" replace />
+  }
+
   return <>{children}</>
 }
 
+/* =========================
+   🛡 ADMIN LAYOUT GUARD
+========================= */
 function AdminLayoutGuard({ roles }: { roles?: string[] }) {
   const { user, token } = useAuthStore()
-  if (!token) return <Navigate to="/login" replace />
-  if (roles && user && !roles.includes(user.role)) return <Navigate to="/" replace />
+
+  if (!token) {
+    const currentUrl = window.location.pathname + window.location.search
+    localStorage.setItem('redirectAfterLogin', currentUrl)
+    return <Navigate to="/login" replace />
+  }
+
+  if (roles && user && !roles.includes(user.role)) {
+    return <Navigate to="/" replace />
+  }
+
   return <AdminLayout />
 }
 
+/* =========================
+   🚀 APP
+========================= */
 export default function App() {
   const location = useLocation()
 
   return (
     <div className="noise-overlay min-h-screen" style={{ background: 'var(--color-bg)' }}>
-
       <SocketNotificationBridge />
 
       <Routes>
 
-        {/* ── Customer (with Navbar Layout) ── */}
+        {/* ── Customer ── */}
         <Route path="/" element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="movies" element={<MoviesPage />} />
           <Route path="movies/:id" element={<MovieDetailPage />} />
           <Route path="showtimes" element={<ShowtimesPage />} />
           <Route path="theaters" element={<TheatersPage />} />
-          <Route path="booking/:showtimeId" element={<PrivateRoute><BookingPage /></PrivateRoute>} />
-          <Route path="seats/:showtimeId" element={
-            <PrivateRoute>
-              <SeatSelectionPage key={location.pathname + location.search} />
-            </PrivateRoute>
-          } />
-          <Route path="payment/:bookingId" element={<PrivateRoute><PaymentPage /></PrivateRoute>} />
-          <Route path="booking-success/:bookingId" element={<PrivateRoute><BookingSuccessPage /></PrivateRoute>} />
-          <Route path="my-bookings" element={<PrivateRoute><MyBookingsPage /></PrivateRoute>} />
-          <Route path="profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
-          <Route path="invoice/:bookingId" element={<PrivateRoute><InvoicePage /></PrivateRoute>} />
+
+          <Route
+            path="booking/:showtimeId"
+            element={
+              <PrivateRoute>
+                <BookingPage />
+              </PrivateRoute>
+            }
+          />
+
+          {/* 🔥 QUAN TRỌNG: giữ key để reload khi query đổi */}
+          <Route
+            path="seats/:showtimeId"
+            element={
+              <PrivateRoute>
+                <SeatSelectionPage key={location.pathname + location.search} />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="payment/:bookingId"
+            element={
+              <PrivateRoute>
+                <PaymentPage />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="booking-success/:bookingId"
+            element={
+              <PrivateRoute>
+                <BookingSuccessPage />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="my-bookings"
+            element={
+              <PrivateRoute>
+                <MyBookingsPage />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="profile"
+            element={
+              <PrivateRoute>
+                <ProfilePage />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="invoice/:bookingId"
+            element={
+              <PrivateRoute>
+                <InvoicePage />
+              </PrivateRoute>
+            }
+          />
         </Route>
 
         {/* ── Auth ── */}
@@ -95,19 +182,92 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-        {/* ── Admin + Staff ── */}
+        {/* ── Admin ── */}
         <Route path="/admin" element={<AdminLayoutGuard roles={['admin', 'staff']} />}>
           <Route index element={<AdminDashboard />} />
           <Route path="payments" element={<AdminPayments />} />
-          <Route path="movies" element={<PrivateRoute roles={['admin']}><AdminMovies /></PrivateRoute>} />
-          <Route path="showtimes" element={<PrivateRoute roles={['admin']}><AdminShowtimes /></PrivateRoute>} />
-          <Route path="users" element={<PrivateRoute roles={['admin']}><AdminUsers /></PrivateRoute>} />
-          <Route path="reports" element={<PrivateRoute roles={['admin']}><AdminReports /></PrivateRoute>} />
-          <Route path="theaters" element={<PrivateRoute roles={['admin']}><AdminTheaters /></PrivateRoute>} />
-          <Route path="rooms" element={<PrivateRoute roles={['admin']}><AdminRooms /></PrivateRoute>} />
-          <Route path="seat-designer" element={<PrivateRoute roles={['admin']}><AdminSeatDesigner /></PrivateRoute>} />
-          <Route path="seat-designer/:roomId" element={<PrivateRoute roles={['admin']}><AdminSeatDesigner /></PrivateRoute>} />
-          <Route path="smart-schedule" element={<PrivateRoute roles={['admin']}><AdminSmartSchedule /></PrivateRoute>} />
+
+          <Route
+            path="movies"
+            element={
+              <PrivateRoute roles={['admin']}>
+                <AdminMovies />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="showtimes"
+            element={
+              <PrivateRoute roles={['admin']}>
+                <AdminShowtimes />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="users"
+            element={
+              <PrivateRoute roles={['admin']}>
+                <AdminUsers />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="reports"
+            element={
+              <PrivateRoute roles={['admin']}>
+                <AdminReports />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="theaters"
+            element={
+              <PrivateRoute roles={['admin']}>
+                <AdminTheaters />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="rooms"
+            element={
+              <PrivateRoute roles={['admin']}>
+                <AdminRooms />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="seat-designer"
+            element={
+              <PrivateRoute roles={['admin']}>
+                <AdminSeatDesigner />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="seat-designer/:roomId"
+            element={
+              <PrivateRoute roles={['admin']}>
+                <AdminSeatDesigner />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="smart-schedule"
+            element={
+              <PrivateRoute roles={['admin']}>
+                <AdminSmartSchedule />
+              </PrivateRoute>
+            }
+          />
+
           <Route path="invoices" element={<AdminInvoices />} />
         </Route>
 

@@ -11,6 +11,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const redis_1 = require("../config/redis");
 let io;
 const groupRooms = new Map();
+const ROOM_TTL_MS = 30 * 60 * 1000; // 30 phút
 function initSocket(server) {
     io = new socket_io_1.Server(server, {
         cors: {
@@ -38,20 +39,15 @@ function initSocket(server) {
         const userId = socket.userId;
         socket.join(`user:${userId}`);
         socket.on('join:user', (uid) => socket.join(`user:${uid}`));
-        socket.on('join:showtime', (showtimeId) => {
-            socket.join(`showtime:${showtimeId}`);
-        });
-        socket.on('leave:showtime', (showtimeId) => {
-            socket.leave(`showtime:${showtimeId}`);
-        });
+        socket.on('join:showtime', (showtimeId) => socket.join(`showtime:${showtimeId}`));
+        socket.on('leave:showtime', (showtimeId) => socket.leave(`showtime:${showtimeId}`));
+        // ── Seat locking ────────────────────────────────────────────────
         socket.on('seat:select', async ({ showtimeId, seatId }) => {
             try {
                 const locked = await (0, redis_1.lockSeat)(showtimeId, seatId, userId);
                 if (locked) {
                     io.to(`showtime:${showtimeId}`).emit('seat:locked', {
-                        seatId,
-                        userId,
-                        showtimeId,
+                        seatId, userId, showtimeId,
                         expiresAt: Date.now() + (parseInt(process.env.SEAT_LOCK_TTL || '300') * 1000),
                     });
                     socket.emit('seat:select:ok', { seatId });
@@ -61,47 +57,75 @@ function initSocket(server) {
                     socket.emit('seat:select:fail', { seatId, reason: 'Seat already taken', lockedBy: owner });
                 }
             }
-            catch (e) {
+            catch {
                 socket.emit('seat:select:fail', { seatId, reason: 'Server error' });
             }
         });
         socket.on('seat:deselect', async ({ showtimeId, seatId }) => {
             try {
                 const released = await (0, redis_1.unlockSeat)(showtimeId, seatId, userId);
-                if (released) {
+                if (released)
                     io.to(`showtime:${showtimeId}`).emit('seat:released', { seatId, showtimeId });
-                }
             }
             catch { }
         });
+        // ── Group booking ────────────────────────────────────────────────
+        // Tạo phòng
         socket.on('group:create', ({ showtimeId, user }) => {
             const roomId = `group_${showtimeId}_${Date.now()}`;
-            groupRooms.set(roomId, { members: new Map() });
-            groupRooms.get(roomId).members.set(userId, user);
+            groupRooms.set(roomId, {
+                hostUserId: userId,
+                members: new Map([[userId, user]]),
+                createdAt: Date.now(),
+            });
             socket.join(roomId);
-            const members = [...groupRooms.get(roomId).members.values()];
             socket.emit('group:created', { roomId });
-            socket.emit('group:members', { members });
+            socket.emit('group:members', { members: [user], hostUserId: userId });
         });
+        // Join thẳng bằng link
         socket.on('group:join', ({ roomId, user }) => {
-            // Tự tạo lại room nếu không tồn tại (server restart mất RAM)
             if (!groupRooms.has(roomId)) {
-                groupRooms.set(roomId, { members: new Map() });
+                socket.emit('group:error', { code: 'ROOM_NOT_FOUND', message: 'Phòng không còn tồn tại hoặc đã hết hạn' });
+                return;
             }
-            groupRooms.get(roomId).members.set(userId, user);
+            const room = groupRooms.get(roomId);
+            // Check link hết hạn 30 phút
+            if (Date.now() - room.createdAt > ROOM_TTL_MS) {
+                groupRooms.delete(roomId);
+                socket.emit('group:error', { code: 'ROOM_EXPIRED', message: 'Link đặt vé nhóm đã hết hạn (30 phút)' });
+                return;
+            }
+            room.members.set(userId, user);
             socket.join(roomId);
-            const members = [...groupRooms.get(roomId).members.values()];
-            io.to(roomId).emit('group:members', { members });
-            socket.emit('group:joined', { roomId, members });
+            const members = [...room.members.values()];
+            // Báo cho người vừa join biết mình đã vào + ai là host
+            socket.emit('group:joined', { roomId, members, hostUserId: room.hostUserId });
+            // Broadcast cho cả phòng
+            io.to(roomId).emit('group:members', { members, hostUserId: room.hostUserId });
+        });
+        // Host kick member
+        socket.on('group:kick', ({ roomId, targetUserId }) => {
+            const room = groupRooms.get(roomId);
+            if (!room || room.hostUserId !== userId)
+                return;
+            if (targetUserId === userId)
+                return; // không tự kick mình
+            room.members.delete(targetUserId);
+            const members = [...room.members.values()];
+            // Báo người bị kick
+            io.to(`user:${targetUserId}`).emit('group:kicked', { roomId });
+            // Broadcast members mới
+            io.to(roomId).emit('group:members', { members, hostUserId: room.hostUserId });
         });
         socket.on('group:seat:hover', ({ roomId, seatId, user }) => {
             socket.to(roomId).emit('group:seat:hover', { seatId, user });
         });
         socket.on('group:leave', ({ roomId }) => {
             if (groupRooms.has(roomId)) {
-                groupRooms.get(roomId).members.delete(userId);
-                const members = [...groupRooms.get(roomId).members.values()];
-                io.to(roomId).emit('group:members', { members });
+                const room = groupRooms.get(roomId);
+                room.members.delete(userId);
+                const members = [...room.members.values()];
+                io.to(roomId).emit('group:members', { members, hostUserId: room.hostUserId });
                 if (members.length === 0)
                     groupRooms.delete(roomId);
             }
@@ -112,13 +136,23 @@ function initSocket(server) {
                 if (room.members.has(userId)) {
                     room.members.delete(userId);
                     const members = [...room.members.values()];
-                    io.to(roomId).emit('group:members', { members });
+                    io.to(roomId).emit('group:members', { members, hostUserId: room.hostUserId });
                     if (members.length === 0)
                         groupRooms.delete(roomId);
                 }
             }
         });
     });
+    // Dọn phòng hết hạn mỗi 5 phút
+    setInterval(() => {
+        const now = Date.now();
+        for (const [roomId, room] of groupRooms.entries()) {
+            if (now - room.createdAt > ROOM_TTL_MS) {
+                io.to(roomId).emit('group:error', { code: 'ROOM_EXPIRED', message: 'Phòng đặt vé đã hết hạn' });
+                groupRooms.delete(roomId);
+            }
+        }
+    }, 5 * 60 * 1000);
     startSeatExpiryWatcher();
     console.log('✅ Socket.io initialized');
     return io;
@@ -141,15 +175,13 @@ function startSeatExpiryWatcher() {
                     trackedLocks.delete(showtimeId);
             }
         }
-        catch (e) { }
+        catch { }
     }, 10000);
 }
 function trackSeatLock(showtimeId, seatIds) {
-    if (!trackedLocks.has(showtimeId)) {
+    if (!trackedLocks.has(showtimeId))
         trackedLocks.set(showtimeId, new Set());
-    }
-    const set = trackedLocks.get(showtimeId);
-    seatIds.forEach(id => set.add(id));
+    seatIds.forEach(id => trackedLocks.get(showtimeId).add(id));
 }
 function getIO() {
     if (!io)

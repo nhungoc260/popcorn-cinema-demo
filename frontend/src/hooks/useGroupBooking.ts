@@ -21,10 +21,20 @@ export function useGroupBooking(showtimeId: string) {
     avatar: user?.avatar || '',
   }
 
-  // Bug 2 fix: đợi socket connect xong mới join room từ URL
+  // Đọc groupRoom từ URL params hoặc localStorage (sau khi login redirect)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    const urlRoomId = params.get('groupRoom')
+    let urlRoomId = params.get('groupRoom')
+
+    // Nếu không có trong URL, thử đọc từ localStorage (sau khi login redirect)
+    if (!urlRoomId) {
+      const saved = localStorage.getItem('pendingGroupRoom')
+      if (saved) {
+        urlRoomId = saved
+        localStorage.removeItem('pendingGroupRoom')
+      }
+    }
+
     if (!urlRoomId || !socket || !user) return
 
     const doJoin = () => {
@@ -47,7 +57,6 @@ export function useGroupBooking(showtimeId: string) {
   useEffect(() => {
     if (!socket) return
 
-    // Bug 3 fix: set member đầu tiên (chính mình) ngay khi tạo phòng
     socket.on('group:created', ({ roomId }: { roomId: string }) => {
       setRoomId(roomId)
       setIsInGroup(true)
@@ -89,7 +98,6 @@ export function useGroupBooking(showtimeId: string) {
     setIsInGroup(false)
   }, [socket, roomId])
 
-  // Bug 1 fix: dùng /seats/ thay vì /seat-selection/ cho đúng với route thực tế
   const getShareLink = useCallback(() => {
     if (!roomId) return ''
     return `${window.location.origin}/seats/${showtimeId}?groupRoom=${roomId}`

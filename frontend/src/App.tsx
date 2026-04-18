@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import Layout from './components/layout/Layout'
 import AdminLayout from './components/admin/AdminLayout'
-import SocketNotificationBridge from './components/ui/SocketNotificationBridge' // [MỚI]
+import SocketNotificationBridge from './components/ui/SocketNotificationBridge'
 
 // Customer pages
 import HomePage from './pages/HomePage'
@@ -20,7 +20,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import NotFoundPage from './pages/NotFoundPage'
-import InvoicePage from './pages/InvoicePage' // [MỚI]
+import InvoicePage from './pages/InvoicePage'
 
 // Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard'
@@ -41,7 +41,16 @@ import StaffCounter from './pages/staff/StaffCounter'
 
 function PrivateRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
   const { user, token } = useAuthStore()
-  if (!token) return <Navigate to="/login" replace />
+  if (!token) {
+    // Lưu groupRoom vào localStorage trước khi redirect login
+    // để sau khi login xong vẫn join được nhóm
+    const params = new URLSearchParams(window.location.search)
+    const groupRoom = params.get('groupRoom')
+    if (groupRoom) {
+      localStorage.setItem('pendingGroupRoom', groupRoom)
+    }
+    return <Navigate to="/login" replace />
+  }
   if (roles && user && !roles.includes(user.role)) return <Navigate to="/" replace />
   return <>{children}</>
 }
@@ -57,7 +66,6 @@ export default function App() {
   return (
     <div className="noise-overlay min-h-screen" style={{ background: 'var(--color-bg)' }}>
 
-      {/* [MỚI] Bridge socket → notifications + tier upgrade detection */}
       <SocketNotificationBridge />
 
       <Routes>
@@ -75,7 +83,7 @@ export default function App() {
           <Route path="booking-success/:bookingId" element={<PrivateRoute><BookingSuccessPage /></PrivateRoute>} />
           <Route path="my-bookings" element={<PrivateRoute><MyBookingsPage /></PrivateRoute>} />
           <Route path="profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
-          <Route path="invoice/:bookingId" element={<PrivateRoute><InvoicePage /></PrivateRoute>} /> {/* [MỚI] */}
+          <Route path="invoice/:bookingId" element={<PrivateRoute><InvoicePage /></PrivateRoute>} />
         </Route>
 
         {/* ── Auth ── */}

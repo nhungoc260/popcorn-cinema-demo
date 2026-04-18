@@ -62,14 +62,14 @@ export function useGroupBooking(showtimeId: string) {
 
     let attempts = 0
     const interval = setInterval(() => {
-      attempts++
-      if (socket.connected) {
+    attempts++
+    if (socket.connected) {
         clearInterval(interval)
         doJoin()
-      } else if (attempts >= 10) {
+    } else if (attempts >= 30) {
         clearInterval(interval)
-      }
-    }, 2000)
+    }
+    }, 3000)
 
     return () => clearInterval(interval)
   }, [socket, user])

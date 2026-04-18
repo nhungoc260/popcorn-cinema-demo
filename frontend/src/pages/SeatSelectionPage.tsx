@@ -100,9 +100,9 @@ export default function SeatSelectionPage() {
   const seats: any[] = seatsData?.data?.data || []
 
   // Với host trong nhóm: hiển thị ghế của toàn nhóm trong order summary
-  // Với cá nhân / member: hiển thị ghế của bản thân
-  const displaySeats = isInGroup && isHost
-    ? seats.filter(s => allGroupSeatIds.includes(s._id))
+  // member không thấy order, chỉ host mới thấy
+  const displaySeats = isInGroup
+    ? (isHost ? seats.filter(s => allGroupSeatIds.includes(s._id)) : [])
     : selectedSeatObjs
 
   const totalAmount = displaySeats.reduce((s, seat) => s + (seat?.price || 0), 0)

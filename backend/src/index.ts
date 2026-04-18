@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import path from 'path';
 dotenv.config();
 
 import { connectDB } from './config/database';
@@ -52,6 +53,10 @@ app.use(`${API}/movies/:movieId/reviews`, reviewRoutes);
 app.use(`${API}/coupons`, couponRoutes);
 app.use(`${API}/reports`, reportRoutes);
 app.get('/health', (_, res) => res.json({ status: 'ok', time: new Date() }));
+app.use(express.static(path.join(process.cwd(), 'public')));
+app.get('*', (_, res) => {
+  res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+});
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;

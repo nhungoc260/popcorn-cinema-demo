@@ -1,7 +1,6 @@
-// src/components/ui/AIChatWidget.tsx
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { movieApi, showtimeApi } from '../../api'
+import { movieApi } from '../../api'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -17,7 +16,6 @@ interface MovieSuggestion {
   rating: number
   duration: number
   status: string
-  showtimes?: any[]
 }
 
 export default function AIChatWidget() {
@@ -66,42 +64,25 @@ export default function AIChatWidget() {
         content: m.content,
       }))
 
-      const systemPrompt = `Bạn là trợ lý AI thân thiện của Popcorn Cinema - rạp chiếu phim tại Việt Nam. 
-Nhiệm vụ của bạn là tư vấn phim cho khách hàng dựa trên tâm trạng, hoàn cảnh và sở thích của họ.
-
-Danh sách phim hiện có:
-${JSON.stringify(movieList, null, 2)}
-
-Hướng dẫn:
-- Trả lời bằng tiếng Việt, thân thiện và nhiệt tình
-- Gợi ý 1-3 phim phù hợp nhất từ danh sách trên
-- Giải thích tại sao phim đó phù hợp với hoàn cảnh của khách
-- Cuối mỗi gợi ý phim, thêm dòng: [PHIM_ID:${'{'}id{'}'}] để hệ thống nhận diện
-- Nếu khách hỏi về suất chiếu, giá vé, hãy hướng dẫn họ bấm nút "Đặt vé" 
-- Giữ câu trả lời ngắn gọn, dưới 200 từ`
-
       const response = await fetch('/api/v1/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            messages: [
-            ...history,
-            { role: 'user', content: userMsg }
-            ],
-            movies: movieList,
+          messages: [...history, { role: 'user', content: userMsg }],
+          movies: movieList,
         }),
-        })
+      })
 
-        const data = await response.json()
-        const text = data.data?.text || 'Xin lỗi, mình không hiểu. Bạn có thể nói rõ hơn không?'
+      const data = await response.json()
+      const text = data.data?.text || 'Xin lỗi, mình không hiểu. Bạn có thể nói rõ hơn không?'
 
-      // Extract movie IDs from response
-      const movieIdMatches = text.matchAll(/\[PHIM_ID:([a-f0-9]+)\]/g)
-      const suggestedIds = [...movieIdMatches].map(m => m[1])
+      // Fix regex - chịu được mọi format AI trả về
+      const movieIdMatches = text.matchAll(/\[PHIM_ID:\s*["']?([a-f0-9]+)["']?\s*\]/g)
+      const suggestedIds = [...movieIdMatches].map((m: any) => m[1])
       const suggestedMovies = movies.filter(m => suggestedIds.includes(m._id))
 
-      // Clean text
-      const cleanText = text.replace(/\[PHIM_ID:[a-f0-9]+\]/g, '').trim()
+      // Xóa tag PHIM_ID khỏi text hiển thị
+      const cleanText = text.replace(/\[PHIM_ID:\s*["']?[a-f0-9]+["']?\s*\]/g, '').trim()
 
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -130,14 +111,10 @@ Hướng dẫn:
 
   return (
     <>
-      {/* Floating button */}
       <button
         onClick={() => setOpen(o => !o)}
         className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110"
-        style={{
-          background: 'linear-gradient(135deg, #A855F7, #7C3AED)',
-          boxShadow: '0 8px 32px rgba(168,85,247,0.5)',
-        }}
+        style={{ background: 'linear-gradient(135deg, #A855F7, #7C3AED)', boxShadow: '0 8px 32px rgba(168,85,247,0.5)' }}
         title="AI tư vấn phim"
       >
         {open ? (
@@ -149,7 +126,6 @@ Hướng dẫn:
         )}
       </button>
 
-      {/* Chat window */}
       {open && (
         <div
           className="fixed bottom-24 right-6 z-50 w-96 rounded-2xl overflow-hidden flex flex-col"
@@ -157,7 +133,7 @@ Hướng dẫn:
             height: '520px',
             background: 'var(--color-bg-2, #1a1a2e)',
             border: '1px solid rgba(168,85,247,0.3)',
-            boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(168,85,247,0.1)',
+            boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
           }}
         >
           {/* Header */}
@@ -197,7 +173,7 @@ Hướng dẫn:
                     {msg.content}
                   </div>
 
-                  {/* Movie suggestions */}
+                  {/* Card phim */}
                   {msg.movies && msg.movies.length > 0 && (
                     <div className="mt-3 space-y-2">
                       {msg.movies.map(movie => (

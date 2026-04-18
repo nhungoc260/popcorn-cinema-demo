@@ -17,10 +17,12 @@ Hướng dẫn:
 - Trả lời bằng tiếng Việt, thân thiện và nhiệt tình
 - Gợi ý 1-3 phim phù hợp nhất từ danh sách trên
 - Giải thích tại sao phim đó phù hợp
-- Cuối mỗi gợi ý phim, thêm: [PHIM_ID:{id}]
-- Ngắn gọn dưới 200 từ`;
+- Cuối mỗi gợi ý phim, thêm ĐÚNG định dạng này: [PHIM_ID:abc123def456]
+- Ngắn gọn dưới 200 từ
 
-    // Chuyển messages sang format Groq (giống OpenAI)
+Ví dụ đúng: [PHIM_ID:69cb138b945925c03bdc08ec]
+Ví dụ SAI: [PHIM_ID: "69cb138b945925c03bdc08ec"]`;
+
     const history = messages.slice(0, -1).map((m: any) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: m.content,
@@ -39,7 +41,6 @@ Hướng dẫn:
     });
 
     const text = completion.choices[0].message.content || '';
-
     return res.json({ success: true, data: { text } });
   } catch (err: any) {
     console.error('AI Chat Error:', err.message);

@@ -30,7 +30,8 @@ export function useGroupBooking(showtimeId: string) {
   }, [user])
 
   useEffect(() => {
-    if (!socket || !user || hasJoinedRef.current) return
+    // Bỏ check hasJoinedRef ở đây — để mỗi lần socket/user thay đổi đều chạy lại
+    if (!socket || !user) return
 
     const params = new URLSearchParams(window.location.search)
     let urlRoomId = params.get('groupRoom')
@@ -60,12 +61,8 @@ export function useGroupBooking(showtimeId: string) {
       return
     }
 
-    // Dùng event thay vì polling - socket.io tự reconnect, khi connect xong sẽ fire
     socket.once('connect', doJoin)
-
-    return () => {
-      socket.off('connect', doJoin)
-    }
+    return () => { socket.off('connect', doJoin) }
   }, [socket, user])
 
   useEffect(() => {
@@ -76,31 +73,34 @@ export function useGroupBooking(showtimeId: string) {
       setIsInGroup(true)
       setMembers([userInfoRef.current])
     }
-
     const onJoined = ({ roomId, members }: { roomId: string; members: GroupMember[] }) => {
       setRoomId(roomId)
       setMembers(members)
       setIsInGroup(true)
     }
-
     const onMembers = ({ members }: { members: GroupMember[] }) => {
       setMembers(members)
     }
-
     const onError = ({ message }: { message: string }) => {
       console.error('group:error', message)
+    }
+    // Reset hasJoinedRef khi disconnect để reconnect sẽ join lại được
+    const onDisconnect = () => {
+      hasJoinedRef.current = false
     }
 
     socket.on('group:created', onCreated)
     socket.on('group:joined', onJoined)
     socket.on('group:members', onMembers)
     socket.on('group:error', onError)
+    socket.on('disconnect', onDisconnect)
 
     return () => {
       socket.off('group:created', onCreated)
       socket.off('group:joined', onJoined)
       socket.off('group:members', onMembers)
       socket.off('group:error', onError)
+      socket.off('disconnect', onDisconnect)
     }
   }, [socket])
 

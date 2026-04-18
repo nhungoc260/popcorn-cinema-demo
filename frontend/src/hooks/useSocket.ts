@@ -13,17 +13,15 @@ export function useSocket() {
     if (!socketInstance) {
       socketInstance = io(window.location.origin, {
         auth: { token },
-        transports: ['websocket'],
+        transports: ['polling', 'websocket'],
         reconnection: true,
-        reconnectionAttempts: 10,
-        reconnectionDelay: 1000,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 2000,
       })
-      // Force re-render khi socket connect xong để useGroupBooking nhận được
       socketInstance.on('connect', () => forceUpdate(n => n + 1))
     } else {
       forceUpdate(n => n + 1)
     }
-
     return () => {}
   }, [token])
 
@@ -47,11 +45,10 @@ export function useShowtimeSocket(
 
   useEffect(() => {
     if (!showtimeId || !token) return
-
     if (!socketInstance) {
       socketInstance = io(window.location.origin, {
         auth: { token },
-        transports: ['websocket'],
+        transports: ['polling', 'websocket'],
       })
     }
     const s = socketInstance

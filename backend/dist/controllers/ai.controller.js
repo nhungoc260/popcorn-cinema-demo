@@ -19,7 +19,7 @@ Hướng dẫn:
 - Cuối mỗi gợi ý phim, thêm: [PHIM_ID:{id}]
 - Ngắn gọn dưới 200 từ`;
         const model = genAI.getGenerativeModel({
-            model: 'gemini-1.5-flash',
+            model: 'gemini-2.0-flash',
             systemInstruction: systemPrompt,
         });
         // Chỉ lấy các cặp user-model, bỏ tin chào đầu tiên

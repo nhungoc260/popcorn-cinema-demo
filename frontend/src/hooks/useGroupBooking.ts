@@ -14,9 +14,8 @@ export function useGroupBooking(showtimeId: string) {
   const [roomId, setRoomId] = useState<string | null>(null)
   const [members, setMembers] = useState<GroupMember[]>([])
   const [isInGroup, setIsInGroup] = useState(false)
-  const hasJoinedRef = useRef(false) // tránh join 2 lần
+  const hasJoinedRef = useRef(false)
 
-  // Dùng useRef để userInfo không thay đổi reference mỗi render
   const userInfoRef = useRef({
     userId: user?.id || '',
     name: user?.name || 'Khách',
@@ -37,7 +36,6 @@ export function useGroupBooking(showtimeId: string) {
     const params = new URLSearchParams(window.location.search)
     let urlRoomId = params.get('groupRoom')
 
-    // Fallback: đọc từ localStorage nếu vừa login xong
     if (!urlRoomId) {
       const saved = localStorage.getItem('pendingGroupRoom')
       if (saved) {
@@ -48,23 +46,34 @@ export function useGroupBooking(showtimeId: string) {
 
     if (!urlRoomId) return
 
-    hasJoinedRef.current = true
+    const roomToJoin = urlRoomId
 
     const doJoin = () => {
-      socket.emit('group:join', { roomId: urlRoomId, user: userInfoRef.current })
-      setRoomId(urlRoomId)
+      if (hasJoinedRef.current) return
+      hasJoinedRef.current = true
+      socket.emit('group:join', { roomId: roomToJoin, user: userInfoRef.current })
+      setRoomId(roomToJoin)
       setIsInGroup(true)
     }
 
     if (socket.connected) {
       doJoin()
-    } else {
-      socket.once('connect', doJoin)
+      return
     }
 
-    return () => {
-      socket.off('connect', doJoin)
-    }
+    // Retry mỗi 2s cho đến khi connect được (tối đa 10 lần - 20s)
+    let attempts = 0
+    const interval = setInterval(() => {
+      attempts++
+      if (socket.connected) {
+        clearInterval(interval)
+        doJoin()
+      } else if (attempts >= 10) {
+        clearInterval(interval)
+      }
+    }, 2000)
+
+    return () => clearInterval(interval)
   }, [socket, user])
 
   // Lắng nghe các sự kiện nhóm

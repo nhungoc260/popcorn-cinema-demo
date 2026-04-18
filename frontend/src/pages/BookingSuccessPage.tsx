@@ -22,6 +22,11 @@ export default function BookingSuccessPage() {
     queryKey: ['booking', bookingId],
     queryFn: () => bookingApi.getOne(bookingId!),
     select: d => d.data.data,
+    refetchInterval: (data: any) => {
+      const status = data?.status
+      if (status === 'confirmed' || status === 'checked_in' || status === 'cancelled') return false
+      return 1000
+    },
   })
 
   // Lấy loyalty hiện tại để so sánh với tier cũ

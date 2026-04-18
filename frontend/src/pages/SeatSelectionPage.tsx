@@ -9,6 +9,7 @@ import BookingSteps from '../components/booking/BookingSteps'
 import { SeatSkeleton } from '../components/ui/Skeletons'
 import toast from 'react-hot-toast'
 import { useSocket } from '../hooks/useSocket'
+import { useGroupBooking } from '../hooks/useGroupBooking'
 
 const fmtTime = (d: string) => new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -18,11 +19,14 @@ export default function SeatSelectionPage() {
   const navigate = useNavigate()
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([])
   const [selectedSeatObjs, setSelectedSeatObjs] = useState<any[]>([])
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const queryClient = useQueryClient()
   const socket = useSocket()
+  const { members, isInGroup, createRoom, leaveRoom, getShareLink, emitHover } = useGroupBooking(showtimeId!)
 
-  const { data: stData, isLoading: loadingSt } = useQuery({
+  const { data: stData } = useQuery({
     queryKey: ['showtime', showtimeId],
     queryFn: () => showtimeApi.getOne(showtimeId!),
     enabled: !!showtimeId,
@@ -32,26 +36,19 @@ export default function SeatSelectionPage() {
     queryKey: ['seats', showtimeId],
     queryFn: () => showtimeApi.getSeats(showtimeId!),
     enabled: !!showtimeId,
-    refetchInterval: 1000, // fallback polling 1s nếu socket không hoạt động
+    refetchInterval: 1000,
   })
 
-  // Socket.IO — lắng nghe ghế thay đổi real-time
   useEffect(() => {
     if (!socket || !showtimeId) return
-
-    // Join room theo showtimeId
     socket.emit('join:showtime', showtimeId)
-
-    // Nhân viên/user khác giữ hoặc thả ghế → refetch ngay
     const handleSeatUpdate = () => {
       queryClient.invalidateQueries({ queryKey: ['seats', showtimeId] })
     }
-
     socket.on('seat:locked', handleSeatUpdate)
     socket.on('seat:released', handleSeatUpdate)
     socket.on('seats:booked', handleSeatUpdate)
-    socket.on('seats:updated', handleSeatUpdate) // fallback event chung
-
+    socket.on('seats:updated', handleSeatUpdate)
     return () => {
       socket.emit('leave:showtime', showtimeId)
       socket.off('seat:locked', handleSeatUpdate)
@@ -77,11 +74,21 @@ export default function SeatSelectionPage() {
     setSelectedSeatObjs(seats)
   }, [])
 
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(getShareLink())
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleCreateRoom = () => {
+    createRoom()
+    setShowShareModal(true)
+  }
+
   const showtime = stData?.data?.data
   const seats: any[] = seatsData?.data?.data || []
   const totalAmount = selectedSeatObjs.reduce((s, seat) => s + seat.price, 0)
 
-  // Tính số cột thực tế để co khung cho vừa
   const maxCols = seats.length > 0
     ? Math.max(...seats.map((s: any) => s.col || s.number || 0))
     : 20
@@ -138,10 +145,65 @@ export default function SeatSelectionPage() {
           {/* Seat Grid */}
           <div className="lg:col-span-2">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card overflow-hidden">
-              <h2 className="font-display font-semibold text-xl pt-6 pb-4 text-center" style={{ color: 'var(--color-text)' }}>
-                Chọn Ghế Ngồi
-              </h2>
-              <div className="overflow-x-auto px-2 pb-6">
+
+              {/* Group Booking Bar */}
+              <div className="px-6 pt-5 pb-3 flex items-center justify-between gap-3 flex-wrap"
+                style={{ borderBottom: '1px solid rgba(168,85,247,0.1)' }}>
+                <h2 className="font-display font-semibold text-xl" style={{ color: 'var(--color-text)' }}>
+                  Chọn Ghế Ngồi
+                </h2>
+
+                {!isInGroup ? (
+                  <button
+                    onClick={handleCreateRoom}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105 hover:shadow-lg"
+                    style={{
+                      background: 'linear-gradient(135deg, #A855F7, #7C3AED)',
+                      color: '#fff',
+                      boxShadow: '0 4px 12px rgba(168,85,247,0.3)',
+                    }}
+                  >
+                    👥 Đặt vé nhóm
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {/* Avatars thành viên */}
+                    <div className="flex -space-x-2">
+                      {members.map((m, i) => (
+                        <div key={m.userId} title={m.name}
+                          className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold flex-shrink-0"
+                          style={{
+                            borderColor: '#7C3AED',
+                            background: `hsl(${i * 60}, 70%, 45%)`,
+                            color: '#fff',
+                            zIndex: members.length - i,
+                          }}>
+                          {m.name.charAt(0).toUpperCase()}
+                        </div>
+                      ))}
+                    </div>
+                    <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      {members.length} người đang chọn
+                    </span>
+                    <button
+                      onClick={() => setShowShareModal(true)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-purple-500/30"
+                      style={{ background: 'rgba(168,85,247,0.15)', color: '#A855F7' }}
+                    >
+                      🔗 Chia sẻ
+                    </button>
+                    <button
+                      onClick={leaveRoom}
+                      className="px-3 py-1.5 rounded-lg text-xs transition-colors hover:bg-white/10"
+                      style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}
+                    >
+                      Rời nhóm
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="overflow-x-auto px-2 pb-6 pt-4">
                 {loadingSeats
                   ? <SeatSkeleton />
                   : <SeatGrid
@@ -184,7 +246,6 @@ export default function SeatSelectionPage() {
                       </div>
                     ))}
                   </div>
-
                   <div className="flex justify-between items-center pt-2">
                     <span className="font-semibold" style={{ color: 'var(--color-text)' }}>Tổng Cộng</span>
                     <span className="font-bold text-lg text-gradient-gold">{totalAmount.toLocaleString('vi')}đ</span>
@@ -211,6 +272,70 @@ export default function SeatSelectionPage() {
           </div>
         </div>
       </div>
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowShareModal(false)}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="rounded-2xl p-6 w-full max-w-md"
+            style={{ background: '#1a1a2e', border: '1px solid rgba(168,85,247,0.3)', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}
+            onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-1" style={{ color: '#fff' }}>👥 Đặt vé nhóm</h3>
+            <p className="text-sm mb-4" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              Chia sẻ link này cho bạn bè để cùng chọn ghế realtime!
+            </p>
+
+            <div className="flex gap-2 mb-4">
+              <input
+                readOnly
+                value={getShareLink()}
+                className="flex-1 min-w-0 rounded-xl px-3 py-2.5 text-xs outline-none"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(168,85,247,0.2)', color: '#fff' }}
+              />
+              <button
+                onClick={handleCopyLink}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold flex-shrink-0 transition-all hover:scale-105"
+                style={{ background: 'linear-gradient(135deg, #A855F7, #7C3AED)', color: '#fff' }}
+              >
+                {copied ? '✅ Đã copy' : '📋 Copy'}
+              </button>
+            </div>
+
+            {/* Danh sách thành viên */}
+            {members.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs mb-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  {members.length} người trong phòng:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {members.map((m, i) => (
+                    <div key={m.userId}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs"
+                      style={{ background: 'rgba(255,255,255,0.06)', color: '#fff' }}>
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold"
+                        style={{ background: `hsl(${i * 60}, 70%, 45%)` }}>
+                        {m.name.charAt(0).toUpperCase()}
+                      </div>
+                      {m.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowShareModal(false)}
+              className="w-full py-2.5 rounded-xl text-sm transition-colors hover:bg-white/10"
+              style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>
+              Đóng
+            </button>
+          </motion.div>
+        </div>
+      )}
     </div>
   )
 }

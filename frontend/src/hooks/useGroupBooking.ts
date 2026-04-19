@@ -24,6 +24,7 @@ export function useGroupBooking(showtimeId: string) {
   const onCheckoutReadyRef = useRef<((seatIds: string[]) => void) | null>(null)
 
   const hasJoinedRoomRef = useRef<string | null>(null)
+  const isInGroupRef = useRef(false)
 
   const userInfoRef = useRef({
     userId: user?.id || '',
@@ -66,7 +67,6 @@ export function useGroupBooking(showtimeId: string) {
     const tryJoin = () => {
       if (!socket.connected) return
       if (hasJoinedRoomRef.current === roomToJoin) return
-      // Bỏ qua nếu room không thuộc suất này (tránh auto-join nhầm suất khác)
       if (!roomToJoin.includes(showtimeId)) {
         localStorage.removeItem('pendingGroupRoom')
         const url = new URL(window.location.href)
@@ -77,7 +77,7 @@ export function useGroupBooking(showtimeId: string) {
       hasJoinedRoomRef.current = roomToJoin
       socket.emit('group:join', { roomId: roomToJoin, user: userInfoRef.current })
       socket.emit('join:showtime', showtimeId)
-      setRoomId(roomToJoin)
+      // Không set roomId ở đây — chờ server confirm qua onJoined
     }
 
     tryJoin()
@@ -105,6 +105,7 @@ export function useGroupBooking(showtimeId: string) {
     const onCreated = ({ roomId }: { roomId: string }) => {
       setRoomId(roomId)
       setIsInGroup(true)
+      isInGroupRef.current = true
       setIsHost(true)
       setHostUserId(userInfoRef.current.userId)
       setMembers([userInfoRef.current])
@@ -115,6 +116,7 @@ export function useGroupBooking(showtimeId: string) {
       setRoomId(roomId)
       setMembers(members)
       setIsInGroup(true)
+      isInGroupRef.current = true
       setHostUserId(hostUserId)
       setIsHost(userInfoRef.current.userId === hostUserId)
       // Nhận seatMap hiện tại của phòng khi mới join
@@ -132,6 +134,7 @@ export function useGroupBooking(showtimeId: string) {
     }
 
     const onKicked = () => {
+      isInGroupRef.current = false
       setRoomId(null)
       setMembers([])
       setIsInGroup(false)
@@ -141,13 +144,25 @@ export function useGroupBooking(showtimeId: string) {
       toast.error('Bạn đã bị host xóa khỏi nhóm')
     }
 
-    const onError = ({ message }: any) => {
+    const onError = ({ code, message }: any) => {
+      const wasInGroup = isInGroupRef.current  // ← lưu lại trước
+      isInGroupRef.current = false
       hasJoinedRoomRef.current = null
       setRoomId(null)
       setMembers([])
       setIsInGroup(false)
       setGroupSeatMap({})
-      toast.error(message || 'Lỗi phòng')
+      if (wasInGroup) {  // ← dùng giá trị đã lưu
+        toast.error(message || 'Lỗi phòng')
+      }
+      if (code === 'ROOM_EXPIRED') {
+        toast.error('Link đặt vé nhóm đã hết hạn (30 phút)', { icon: '⏰' })
+        setTimeout(() => {
+          const url = new URL(window.location.href)
+          url.searchParams.delete('groupRoom')
+          window.history.replaceState({}, '', url.toString())
+        }, 1000)
+      }
     }
 
     const onDisconnect = () => {

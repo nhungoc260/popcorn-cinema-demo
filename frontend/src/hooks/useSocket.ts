@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client'
 import { useAuthStore } from '../store/authStore'
 
 let socketInstance: Socket | null = null
+let currentToken: string | null = null
 
 export function useSocket() {
   const { token } = useAuthStore()
@@ -11,7 +12,15 @@ export function useSocket() {
   useEffect(() => {
     if (!token) return
 
+    // Nếu token thay đổi (user khác login) → disconnect socket cũ, tạo mới
+    if (socketInstance && currentToken !== token) {
+      socketInstance.disconnect()
+      socketInstance = null
+      currentToken = null
+    }
+
     if (!socketInstance) {
+      currentToken = token
       socketInstance = io(window.location.origin, {
         auth: { token },
         transports: ['polling', 'websocket'],
@@ -19,7 +28,6 @@ export function useSocket() {
         reconnectionAttempts: Infinity,
         reconnectionDelay: 2000,
       })
-
       socketInstance.on('connect', () => {
         console.log('✅ socket connected')
         forceUpdate(n => n + 1)
@@ -27,7 +35,6 @@ export function useSocket() {
     } else {
       forceUpdate(n => n + 1)
     }
-
     return () => {}
   }, [token])
 

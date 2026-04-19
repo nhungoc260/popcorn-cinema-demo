@@ -4,8 +4,8 @@ import { useAuthStore } from '../store/authStore'
 
 export interface AppNotification {
   id: string
-  type: 'tier_upgrade' | 'payment_confirmed' | 'payment_rejected' | 'booking_success'
-  title: string
+  type: 'tier_upgrade' | 'payment_confirmed' | 'payment_rejected' | 'booking_success' | 'showtime_reminder' | 'movie_suggestion' | 'promotion'
+  title: string  
   message: string
   createdAt: Date
   read: boolean
@@ -76,7 +76,6 @@ export function useNotifications() {
         message: `Mã vé ${data.bookingCode} đã được xác nhận. +${data.pointsEarned} điểm`,
         meta: data,
       })
-
       const lastTier = localStorage.getItem('popcorn_last_tier') || 'bronze'
       const TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum']
       const newTier = data.newLoyaltyTier || 'bronze'
@@ -100,6 +99,34 @@ export function useNotifications() {
       })
     }
 
+    const reminderInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/v1/bookings/my', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
+        })
+        const data = await res.json()
+        const bookings = data.data || []
+        const now = Date.now()
+        bookings.forEach((b: any) => {
+          if (b.status !== 'confirmed') return
+          const startTime = new Date(b.showtime?.startTime).getTime()
+          const diffMin = (startTime - now) / 60000
+          if (diffMin > 59 && diffMin < 61) {
+            const key = `reminded_${b._id}`
+            if (!localStorage.getItem(key)) {
+              localStorage.setItem(key, '1')
+              addNotification({
+                type: 'showtime_reminder',
+                title: '🎬 Sắp đến giờ chiếu!',
+                message: `${b.showtime?.movie?.title} chiếu lúc ${new Date(b.showtime?.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} tại ${b.showtime?.theater?.name}`,
+                meta: b,
+              })
+            }
+          }
+        })
+      } catch {}
+    }, 60000)
+
     const onConfirmed = (e: any) => handlePaymentConfirmed(e.detail)
     const onRejected = (e: any) => handlePaymentRejected(e.detail)
     window.addEventListener('socket:payment:confirmed', onConfirmed)
@@ -108,6 +135,7 @@ export function useNotifications() {
     return () => {
       window.removeEventListener('socket:payment:confirmed', onConfirmed)
       window.removeEventListener('socket:payment:rejected', onRejected)
+      clearInterval(reminderInterval)
     }
   }, [user])
 

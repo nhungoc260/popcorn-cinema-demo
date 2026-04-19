@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -93,11 +93,15 @@ export default function SeatSelectionPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleCreateRoom = async () => {
-    await createRoom()
-    setShowShareModal(true)
-  }
+  useEffect(() => {
+    if (roomId && isHost && !showShareModal) {
+      setShowShareModal(true)
+    }
+  }, [roomId, isHost])
 
+  const handleCreateRoom = () => {
+    createRoom()
+  }
   const handleHostCheckout = () => {
     if (allGroupSeatIds.length === 0) {
       toast.error('Chưa có ai chọn ghế trong nhóm!')

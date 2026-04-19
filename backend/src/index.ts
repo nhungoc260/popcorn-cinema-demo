@@ -25,6 +25,7 @@ import reviewRoutes from './routes/review.routes';
 import couponRoutes from './routes/coupon.routes';
 import reportRoutes from './routes/report.routes';
 import aiRoutes from './routes/ai.routes';
+import membershipRoutes from './routes/membership.routes';
 
 const app = express();
 const server = http.createServer(app);
@@ -57,6 +58,7 @@ app.use(`${API}/movies/:movieId/reviews`, reviewRoutes);
 app.use(`${API}/coupons`, couponRoutes);
 app.use(`${API}/reports`, reportRoutes);
 app.use(`${API}/ai`, aiRoutes);
+app.use(`${API}/membership`, membershipRoutes);
 app.get('/health', (_, res) => res.json({ status: 'ok', time: new Date() }));
 app.use(express.static(path.join(process.cwd(), 'public')));
 app.get('*', (_, res) => {

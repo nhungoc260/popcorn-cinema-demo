@@ -59,7 +59,7 @@ export default function ProfilePage() {
   // Load loyalty points
   const { data: loyaltyData } = useQuery({
     queryKey: ['my-loyalty'],
-    queryFn: () => api.get('/coupons/loyalty'),
+    queryFn: () => api.get('/membership/me'),
     select: d => d.data.data,
   })
 

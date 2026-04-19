@@ -30,6 +30,7 @@ const coupon_routes_1 = __importDefault(require("./routes/coupon.routes"));
 const report_routes_1 = __importDefault(require("./routes/report.routes"));
 const ai_routes_1 = __importDefault(require("./routes/ai.routes"));
 const membership_routes_1 = __importDefault(require("./routes/membership.routes"));
+const support_routes_1 = __importDefault(require("./routes/support.routes"));
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app);
 exports.server = server;
@@ -60,6 +61,7 @@ app.use(`${API}/coupons`, coupon_routes_1.default);
 app.use(`${API}/reports`, report_routes_1.default);
 app.use(`${API}/ai`, ai_routes_1.default);
 app.use(`${API}/membership`, membership_routes_1.default);
+app.use(`${API}/support`, support_routes_1.default);
 app.get('/health', (_, res) => res.json({ status: 'ok', time: new Date() }));
 app.use(express_1.default.static(path_1.default.join(process.cwd(), 'public')));
 app.get('*', (_, res) => {

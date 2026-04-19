@@ -24,6 +24,7 @@ const TABS = [
   { id: 'confirm',  label: '💰 Xác Nhận CK',       activeColor: '#FDE68A' },
   { id: 'revenue',  label: '📊 Doanh Thu',          activeColor: '#34D399' },
   { id: 'invoices', label: '🧾 Hóa Đơn',            activeColor: '#60a5fa' },
+  { id: 'support', label: '🆘 Hỗ Trợ',             activeColor: '#34D399' },
 ]
 
 // 7 ngày để chọn suất chiếu (dùng local date tránh lệch timezone UTC vs VN)
@@ -39,7 +40,7 @@ const DATES = Array.from({ length: 7 }, (_, i) => {
 export default function StaffCounter() {
   const qc = useQueryClient()
   const { user } = useAuthStore()
-  const [tab, setTab] = useState<'sell' | 'confirm' | 'revenue' | 'invoices'>('sell')
+  const [tab, setTab] = useState<'sell' | 'confirm' | 'revenue' | 'invoices' | 'support'>('sell')
 
   // ── SELL STATE ──
   const [selDate, setSelDate]         = useState(DATES[0].value)
@@ -1241,6 +1242,7 @@ export default function StaffCounter() {
       {tab === 'invoices' && (
         <InvoicesTab />
       )}
+      {tab === 'support' && <SupportTab />}
       {/* ── Modal QR sau khi xác nhận CK ── */}
       {confirmedPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -1602,6 +1604,123 @@ function InvoicesTab() {
               )}
             </div>
           </motion.div>
+        </div>
+      )}
+    </motion.div>
+  )
+}
+function SupportTab() {
+  const qc = useQueryClient()
+  const [note, setNote] = useState<Record<string, string>>({})
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['support-tickets'],
+    queryFn: () => api.get('/support/tickets'),
+    select: d => d.data.data as any[],
+    refetchInterval: 15000,
+  })
+
+  const { mutate: updateTicket } = useMutation({
+    mutationFn: ({ id, status, n }: any) =>
+      api.patch(`/support/tickets/${id}`, { status, note: n }),
+    onSuccess: () => {
+      toast.success('Đã cập nhật!')
+      qc.invalidateQueries({ queryKey: ['support-tickets'] })
+    },
+  })
+
+  const tickets = data || []
+
+  const STATUS_COLOR: Record<string, string> = {
+    pending: '#f97316',
+    in_progress: '#60a5fa',
+    resolved: '#34d399',
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+          Yêu cầu hỗ trợ từ chatbot
+          {tickets.filter((t: any) => t.status === 'pending').length > 0 && (
+            <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold"
+              style={{ background: 'rgba(249,115,22,0.15)', color: '#f97316', border: '1px solid rgba(249,115,22,0.3)' }}>
+              {tickets.filter((t: any) => t.status === 'pending').length} chờ xử lý
+            </span>
+          )}
+        </div>
+        <button onClick={() => refetch()} className="p-1.5 rounded-lg flex items-center gap-1 text-xs"
+          style={{ border: '1px solid var(--color-glass-border)', color: 'var(--color-text-muted)' }}>
+          <RefreshCw className="w-3.5 h-3.5" /> Làm mới
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="p-8 text-center" style={{ color: 'var(--color-text-muted)' }}>Đang tải...</div>
+      ) : tickets.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 rounded-2xl"
+          style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+          <span className="text-4xl mb-3">💬</span>
+          <p className="font-semibold" style={{ color: 'var(--color-text)' }}>Chưa có yêu cầu nào</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>Tự động cập nhật mỗi 15 giây</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {tickets.map((t: any) => (
+            <div key={t.id} className="p-4 rounded-2xl"
+              style={{ background: 'var(--color-bg-2)', border: `1px solid ${t.status === 'pending' ? 'rgba(249,115,22,0.3)' : 'var(--color-glass-border)'}` }}>
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold" style={{ color: '#34d399' }}>{t.id}</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded"
+                      style={{ background: `${STATUS_COLOR[t.status]}20`, color: STATUS_COLOR[t.status] }}>
+                      {t.status === 'pending' ? 'Chờ xử lý' : t.status === 'in_progress' ? 'Đang xử lý' : 'Đã xử lý'}
+                    </span>
+                  </div>
+                  <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    {t.userName} · {new Date(t.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-sm mb-3 p-3 rounded-xl"
+                style={{ color: 'var(--color-text)', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--color-glass-border)' }}>
+                {t.message}
+              </p>
+
+              {t.status !== 'resolved' && (
+                <div className="space-y-2">
+                  <textarea
+                    value={note[t.id] ?? t.note}
+                    onChange={e => setNote(prev => ({ ...prev, [t.id]: e.target.value }))}
+                    placeholder="Ghi chú xử lý..."
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-xl text-xs outline-none resize-none"
+                    style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text)' }}
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={() => updateTicket({ id: t.id, status: 'in_progress', n: note[t.id] || t.note })}
+                      className="flex-1 py-2 rounded-xl text-xs font-semibold"
+                      style={{ background: 'rgba(96,165,250,0.1)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)' }}>
+                      🔄 Đang xử lý
+                    </button>
+                    <button onClick={() => updateTicket({ id: t.id, status: 'resolved', n: note[t.id] || t.note })}
+                      className="flex-1 py-2 rounded-xl text-xs font-semibold"
+                      style={{ background: 'rgba(52,211,153,0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }}>
+                      ✅ Đã xử lý
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {t.status === 'resolved' && t.note && (
+                <p className="text-xs p-2 rounded-lg" style={{ background: 'rgba(52,211,153,0.08)', color: '#34d399' }}>
+                  ✅ {t.note}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </motion.div>

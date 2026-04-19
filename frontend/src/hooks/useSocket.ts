@@ -32,6 +32,15 @@ export function useSocket() {
         console.log('✅ socket connected')
         forceUpdate(n => n + 1)
       })
+
+      // Keep-alive ping mỗi 8 phút để Render.com không sleep
+      const keepAlive = setInterval(() => {
+        fetch('/health').catch(() => {})
+      }, 8 * 60 * 1000)
+
+      socketInstance.on('disconnect', () => {
+        clearInterval(keepAlive)
+      })
     } else {
       forceUpdate(n => n + 1)
     }

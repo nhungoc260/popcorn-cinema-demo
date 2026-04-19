@@ -32,15 +32,18 @@ export const createTicket = async (req: AuthRequest, res: Response) => {
       note:      '',
     })
 
-    res.status(201).json({ success: true, data: {
-      id:        ticket.ticketId,
-      userName:  ticket.userName,
-      userEmail: ticket.userEmail,
-      message:   ticket.message,
-      status:    ticket.status,
-      createdAt: ticket.createdAt,
-      note:      ticket.note,
-    }})
+    res.status(201).json({
+      success: true,
+      data: {
+        id:        ticket.ticketId,
+        userName:  ticket.userName,
+        userEmail: ticket.userEmail,
+        message:   ticket.message,
+        status:    ticket.status,
+        createdAt: ticket.createdAt,
+        note:      ticket.note,
+      }
+    })
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message })
   }
@@ -58,14 +61,19 @@ export const getTickets = async (req: AuthRequest, res: Response) => {
       .limit(100)
       .lean()
 
+    // Fix 304 cache issue - buộc server luôn trả data mới
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+    res.set('Pragma', 'no-cache')
+    res.set('Expires', '0')
+
     const data = tickets.map(t => ({
-      id:        t.ticketId,
-      userName:  t.userName,
-      userEmail: t.userEmail,
-      message:   t.message,
-      status:    t.status,
-      createdAt: t.createdAt,
-      note:      t.note,
+      id:         t.ticketId,
+      userName:   t.userName,
+      userEmail:  t.userEmail,
+      message:    t.message,
+      status:     t.status,
+      createdAt:  t.createdAt,
+      note:       t.note,
       resolvedAt: t.resolvedAt,
     }))
 
@@ -92,16 +100,21 @@ export const updateTicket = async (req: AuthRequest, res: Response) => {
       { new: true }
     )
 
-    if (!ticket) return res.status(404).json({ success: false, message: 'Không tìm thấy ticket' })
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy ticket' })
+    }
 
-    res.json({ success: true, data: {
-      id:        ticket.ticketId,
-      userName:  ticket.userName,
-      message:   ticket.message,
-      status:    ticket.status,
-      note:      ticket.note,
-      createdAt: ticket.createdAt,
-    }})
+    res.json({
+      success: true,
+      data: {
+        id:        ticket.ticketId,
+        userName:  ticket.userName,
+        message:   ticket.message,
+        status:    ticket.status,
+        note:      ticket.note,
+        createdAt: ticket.createdAt,
+      }
+    })
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message })
   }

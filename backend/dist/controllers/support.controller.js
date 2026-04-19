@@ -27,7 +27,9 @@ const createTicket = async (req, res) => {
             status: 'pending',
             note: '',
         });
-        res.status(201).json({ success: true, data: {
+        res.status(201).json({
+            success: true,
+            data: {
                 id: ticket.ticketId,
                 userName: ticket.userName,
                 userEmail: ticket.userEmail,
@@ -35,7 +37,8 @@ const createTicket = async (req, res) => {
                 status: ticket.status,
                 createdAt: ticket.createdAt,
                 note: ticket.note,
-            } });
+            }
+        });
     }
     catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -53,6 +56,10 @@ const getTickets = async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(100)
             .lean();
+        // Fix 304 cache issue - buộc server luôn trả data mới
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
         const data = tickets.map(t => ({
             id: t.ticketId,
             userName: t.userName,
@@ -83,16 +90,20 @@ const updateTicket = async (req, res) => {
         if (status === 'resolved')
             update.resolvedAt = new Date();
         const ticket = await models_1.SupportTicket.findOneAndUpdate({ ticketId: id }, update, { new: true });
-        if (!ticket)
+        if (!ticket) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy ticket' });
-        res.json({ success: true, data: {
+        }
+        res.json({
+            success: true,
+            data: {
                 id: ticket.ticketId,
                 userName: ticket.userName,
                 message: ticket.message,
                 status: ticket.status,
                 note: ticket.note,
                 createdAt: ticket.createdAt,
-            } });
+            }
+        });
     }
     catch (err) {
         res.status(500).json({ success: false, message: err.message });

@@ -1615,9 +1615,13 @@ function SupportTab() {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['support-tickets'],
-    queryFn: () => api.get('/support/tickets'),
+    queryFn: () => api.get('/support/tickets', {
+      headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+    }),
     select: d => d.data.data as any[],
-    refetchInterval: 15000,
+    refetchInterval: 1000,
+    staleTime: 0,
+    gcTime: 0,
   })
 
   const { mutate: updateTicket } = useMutation({

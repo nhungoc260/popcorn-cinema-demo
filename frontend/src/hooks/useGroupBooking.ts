@@ -66,6 +66,14 @@ export function useGroupBooking(showtimeId: string) {
     const tryJoin = () => {
       if (!socket.connected) return
       if (hasJoinedRoomRef.current === roomToJoin) return
+      // Bỏ qua nếu room không thuộc suất này (tránh auto-join nhầm suất khác)
+      if (!roomToJoin.includes(showtimeId)) {
+        localStorage.removeItem('pendingGroupRoom')
+        const url = new URL(window.location.href)
+        url.searchParams.delete('groupRoom')
+        window.history.replaceState({}, '', url.toString())
+        return
+      }
       hasJoinedRoomRef.current = roomToJoin
       socket.emit('group:join', { roomId: roomToJoin, user: userInfoRef.current })
       socket.emit('join:showtime', showtimeId)

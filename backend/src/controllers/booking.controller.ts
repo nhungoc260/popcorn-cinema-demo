@@ -161,13 +161,16 @@ export async function createBooking(req: AuthRequest, res: Response) {
     }
 
     const allowedLockers: string[] = isGroupBooking && Array.isArray(groupMemberIds) && groupMemberIds.length > 0
-      ? [userId, ...groupMemberIds.filter((id: string) => id !== userId)]
-      : [userId]
+  ? [userId, ...groupMemberIds.map((id: string) => id.toString())]
+  : [userId]
 
     const lockedByOther: string[] = [];
     for (const seatId of seatIds) {
       const owner = await getSeatLockOwner(showtimeId, seatId);
-      if (owner && !allowedLockers.includes(owner)) lockedByOther.push(seatId);
+      // Nếu là group booking thì bỏ qua ghế do chính member trong nhóm lock
+      if (owner && !allowedLockers.includes(owner.toString())) {
+        lockedByOther.push(seatId);
+      }
     }
     if (lockedByOther.length > 0) {
       const labels = selectedSeats
@@ -180,7 +183,8 @@ export async function createBooking(req: AuthRequest, res: Response) {
       showtime: showtimeId,
       status: { $in: ['pending', 'pending_payment'] },
       expiresAt: { $gt: new Date() },
-      user: { $nin: allowedLockers },
+      // Bỏ qua booking của chính các member trong nhóm
+      user: { $nin: allowedLockers.map(id => id.toString()) },
     }).lean();
     const pendingSeats = new Set(pendingBookings.flatMap((b: any) => b.seats.map((s: any) => s.toString())));
     const conflictPending = seatIds.filter((id: string) => pendingSeats.has(id));

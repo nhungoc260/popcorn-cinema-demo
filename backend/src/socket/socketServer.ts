@@ -236,6 +236,13 @@ export function initSocket(server: http.Server) {
       socket.emit('group:checkout:ready', { allSeatIds })
     })
 
+    socket.on('group:booking:done', ({ roomId, bookingId }: { roomId: string; bookingId: string }) => {
+      const room = groupRooms.get(roomId)
+      if (!room || room.hostUserId !== userId) return
+      // Báo tất cả member redirect về trang success
+      socket.to(roomId).emit('group:booking:done', { bookingId })
+    })
+    
     socket.on('group:seat:hover', ({ roomId, seatId, user }: any) => {
       socket.to(roomId).emit('group:seat:hover', { seatId, user })
     })

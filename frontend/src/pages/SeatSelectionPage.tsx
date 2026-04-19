@@ -26,6 +26,7 @@ export default function SeatSelectionPage() {
   const queryClient = useQueryClient()
 
   const {
+    roomId, socket,
     members, isInGroup, isHost, hostUserId,
     groupSeatMap, allGroupSeatIds,
     createRoom, leaveRoom, kickMember,
@@ -64,6 +65,10 @@ export default function SeatSelectionPage() {
     ),
     onSuccess: (res) => {
       toast.success('Ghế đã được giữ! Thanh toán trong 5 phút.')
+      // Nếu là host group booking → báo member biết rồi navigate
+      if (isHost && isInGroup && roomId) {
+        socket?.emit('group:booking:done', { roomId, bookingId: res.data.data._id })
+      }
       navigate(`/payment/${res.data.data._id}`)
     },
     onError: (err: any) => {

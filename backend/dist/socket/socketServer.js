@@ -194,6 +194,13 @@ function initSocket(server) {
             // Trả về allSeatIds cho host để tạo booking
             socket.emit('group:checkout:ready', { allSeatIds });
         });
+        socket.on('group:booking:done', ({ roomId, bookingId }) => {
+            const room = groupRooms.get(roomId);
+            if (!room || room.hostUserId !== userId)
+                return;
+            // Báo tất cả member redirect về trang success
+            socket.to(roomId).emit('group:booking:done', { bookingId });
+        });
         socket.on('group:seat:hover', ({ roomId, seatId, user }) => {
             socket.to(roomId).emit('group:seat:hover', { seatId, user });
         });

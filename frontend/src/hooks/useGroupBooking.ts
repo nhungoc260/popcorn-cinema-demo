@@ -170,6 +170,15 @@ export function useGroupBooking(showtimeId: string) {
     socket.on('disconnect', onDisconnect)
     socket.on('group:checkout', onCheckout)
     socket.on('group:checkout:ready', onCheckoutReady)
+    const onBookingDone = ({ bookingId }: { bookingId: string }) => {
+      toast.success('👑 Host đã thanh toán xong! Chúc xem phim vui 🎬', {
+        duration: 5000,
+        style: { background: '#1a1a2e', color: '#fff', border: '1px solid rgba(168,85,247,0.4)' },
+      })
+      setTimeout(() => { window.location.href = `/booking-success/${bookingId}` }, 1500)
+    }
+
+    socket.on('group:booking:done', onBookingDone)
 
     return () => {
       socket.off('group:created', onCreated)
@@ -181,6 +190,7 @@ export function useGroupBooking(showtimeId: string) {
       socket.off('disconnect', onDisconnect)
       socket.off('group:checkout', onCheckout)
       socket.off('group:checkout:ready', onCheckoutReady)
+      socket.off('group:booking:done', onBookingDone)
     }
   }, [socket])
 
@@ -227,6 +237,7 @@ export function useGroupBooking(showtimeId: string) {
 
   return {
     roomId,
+    socket,
     members,
     isInGroup,
     isHost,

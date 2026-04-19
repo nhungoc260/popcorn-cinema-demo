@@ -53,7 +53,15 @@ export default function SeatSelectionPage() {
   })
 
   const createBookingMutation = useMutation({
-    mutationFn: (seatIds: string[]) => bookingApi.create(showtimeId || '', seatIds),
+    mutationFn: (seatIds: string[]) => bookingApi.create(
+      showtimeId || '',
+      seatIds,
+      // ✅ Gửi thêm groupMemberIds khi host chốt đơn nhóm
+      isHost && isInGroup ? {
+        isGroupBooking: true,
+        groupMemberIds: members.map(m => m.userId),
+      } : undefined
+    ),
     onSuccess: (res) => {
       toast.success('Ghế đã được giữ! Thanh toán trong 5 phút.')
       navigate(`/payment/${res.data.data._id}`)

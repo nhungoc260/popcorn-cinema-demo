@@ -121,14 +121,14 @@ export const theaterApi = {
 
 // ── Bookings ───────────────────────────────────────────────
 export const bookingApi = {
-  create: (showtimeId: string, seatIds: string[], customerId?: string, guestName?: string, guestPhone?: string) =>
-    api.post('/bookings', { showtimeId, seatIds, ...(customerId ? { customerId } : {}), ...(guestName ? { guestName } : {}), ...(guestPhone ? { guestPhone } : {}) }),
+  create: (showtimeId: string, seatIds: string[], extraData?: Record<string, any>) =>
+    api.post('/bookings', { showtimeId, seatIds, ...extraData }),
   getMy: () => api.get('/bookings/my'),
   getOne: (id: string) => api.get(`/bookings/${id}`),
   cancel: (id: string) => api.patch(`/bookings/${id}/cancel`),
   checkIn: (bookingCode: string) => api.post('/bookings/check-in', { bookingCode }),
-  // Bán tại quầy: có thể truyền customerId + guestInfo
-  createCounter: (showtimeId: string, seatIds: string[], customerId?: string, guestInfo?: { name: string; phone: string }) => api.post('/bookings', { showtimeId, seatIds, ...(customerId ? { customerId } : {}), ...(guestInfo ? { guestName: guestInfo.name, guestPhone: guestInfo.phone } : {}) }),
+  createCounter: (showtimeId: string, seatIds: string[], customerId?: string, guestInfo?: { name: string; phone: string }) =>
+    api.post('/bookings', { showtimeId, seatIds, isCounterSale: true, ...(customerId ? { customerId } : {}), ...(guestInfo ? { guestName: guestInfo.name, guestPhone: guestInfo.phone } : {}) }),
 }
 
 // ── Payments ───────────────────────────────────────────────

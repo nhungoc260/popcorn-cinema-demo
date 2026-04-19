@@ -137,7 +137,7 @@ async function applyPoints(req, res) {
 // POST /bookings
 async function createBooking(req, res) {
     try {
-        const { showtimeId, seatIds: rawSeatIds, seats: legacySeats, customerId, isCounterSale } = req.body;
+        const { showtimeId, seatIds: rawSeatIds, seats: legacySeats, customerId, isCounterSale, isGroupBooking, groupMemberIds } = req.body;
         const seatIds = rawSeatIds || legacySeats || [];
         const isStaff = ['admin', 'staff'].includes(req.user?.role || '');
         // Xác định userId:
@@ -190,10 +190,13 @@ async function createBooking(req, res) {
             const labels = conflictSeats.map((s) => `${s.row}${s.number || s.col}`).join(', ');
             return res.status(409).json({ success: false, message: `Ghế ${labels} đã được đặt` });
         }
+        const allowedLockers = isGroupBooking && Array.isArray(groupMemberIds) && groupMemberIds.length > 0
+            ? [userId, ...groupMemberIds.filter((id) => id !== userId)]
+            : [userId];
         const lockedByOther = [];
         for (const seatId of seatIds) {
             const owner = await (0, redis_1.getSeatLockOwner)(showtimeId, seatId);
-            if (owner && owner !== userId)
+            if (owner && !allowedLockers.includes(owner))
                 lockedByOther.push(seatId);
         }
         if (lockedByOther.length > 0) {
@@ -206,7 +209,7 @@ async function createBooking(req, res) {
             showtime: showtimeId,
             status: { $in: ['pending', 'pending_payment'] },
             expiresAt: { $gt: new Date() },
-            user: { $ne: userId },
+            user: { $nin: allowedLockers },
         }).lean();
         const pendingSeats = new Set(pendingBookings.flatMap((b) => b.seats.map((s) => s.toString())));
         const conflictPending = seatIds.filter((id) => pendingSeats.has(id));

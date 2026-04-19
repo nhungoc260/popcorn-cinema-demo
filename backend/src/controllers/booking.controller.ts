@@ -101,7 +101,7 @@ export async function applyPoints(req: AuthRequest, res: Response) {
 // POST /bookings
 export async function createBooking(req: AuthRequest, res: Response) {
   try {
-    const { showtimeId, seatIds: rawSeatIds, seats: legacySeats, customerId, isCounterSale } = req.body;
+    const { showtimeId, seatIds: rawSeatIds, seats: legacySeats, customerId, isCounterSale, isGroupBooking, groupMemberIds } = req.body;
     const seatIds: string[] = rawSeatIds || legacySeats || [];
     const isStaff = ['admin', 'staff'].includes(req.user?.role || '');
 
@@ -160,10 +160,14 @@ export async function createBooking(req: AuthRequest, res: Response) {
       return res.status(409).json({ success: false, message: `Ghế ${labels} đã được đặt` });
     }
 
+    const allowedLockers: string[] = isGroupBooking && Array.isArray(groupMemberIds) && groupMemberIds.length > 0
+      ? [userId, ...groupMemberIds.filter((id: string) => id !== userId)]
+      : [userId]
+
     const lockedByOther: string[] = [];
     for (const seatId of seatIds) {
       const owner = await getSeatLockOwner(showtimeId, seatId);
-      if (owner && owner !== userId) lockedByOther.push(seatId);
+      if (owner && !allowedLockers.includes(owner)) lockedByOther.push(seatId);
     }
     if (lockedByOther.length > 0) {
       const labels = selectedSeats
@@ -176,7 +180,7 @@ export async function createBooking(req: AuthRequest, res: Response) {
       showtime: showtimeId,
       status: { $in: ['pending', 'pending_payment'] },
       expiresAt: { $gt: new Date() },
-      user: { $ne: userId },
+      user: { $nin: allowedLockers },
     }).lean();
     const pendingSeats = new Set(pendingBookings.flatMap((b: any) => b.seats.map((s: any) => s.toString())));
     const conflictPending = seatIds.filter((id: string) => pendingSeats.has(id));

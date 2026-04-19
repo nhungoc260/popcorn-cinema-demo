@@ -20,6 +20,8 @@ function initSocket(server) {
             credentials: true,
         },
         pingTimeout: 60000,
+        transports: ['polling'], // bỏ websocket cho Render free
+        allowUpgrades: false, // không upgrade lên websocket
     });
     io.use((socket, next) => {
         const token = socket.handshake.auth.token;

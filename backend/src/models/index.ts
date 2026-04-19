@@ -397,6 +397,31 @@ const TicketSchema = new Schema<ITicket>({
 TicketSchema.index({ bookingCode: 1 });
 TicketSchema.index({ user: 1, createdAt: -1 });
 
+export interface ISupportTicket extends Document {
+  ticketId: string
+  userId?: mongoose.Types.ObjectId
+  userName: string
+  userEmail: string
+  message: string
+  category: string
+  status: 'pending' | 'in_progress' | 'resolved'
+  note: string
+  resolvedAt?: Date
+  createdAt: Date
+}
+
+const SupportTicketSchema = new Schema<ISupportTicket>({
+  ticketId:  { type: String, required: true, unique: true },
+  userId:    { type: Schema.Types.ObjectId, ref: 'User', default: null },
+  userName:  { type: String, default: 'Khách vãng lai' },
+  userEmail: { type: String, default: '' },
+  message:   { type: String, required: true },
+  category:  { type: String, default: 'general' },
+  status:    { type: String, enum: ['pending', 'in_progress', 'resolved'], default: 'pending' },
+  note:      { type: String, default: '' },
+  resolvedAt: Date,
+}, { timestamps: true })
+
 // ── Exports ────────────────────────────────────────────────
 export const User     = mongoose.model<IUser>('User', UserSchema);
 export const Movie    = mongoose.model<IMovie>('Movie', MovieSchema);
@@ -411,3 +436,4 @@ export const Review   = mongoose.model<IReview>('Review', ReviewSchema);
 export const Coupon   = mongoose.model<ICoupon>('Coupon', CouponSchema);
 export const Loyalty  = mongoose.model<ILoyalty>('Loyalty', LoyaltySchema);
 export const Ticket   = mongoose.model<ITicket>('Ticket', TicketSchema);
+export const SupportTicket = mongoose.model<ISupportTicket>('SupportTicket', SupportTicketSchema)

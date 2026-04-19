@@ -173,6 +173,18 @@ export interface ITicket extends Document {
     usedAt?: Date;
     paidAmount: number;
 }
+export interface ISupportTicket extends Document {
+    ticketId: string;
+    userId?: mongoose.Types.ObjectId;
+    userName: string;
+    userEmail: string;
+    message: string;
+    category: string;
+    status: 'pending' | 'in_progress' | 'resolved';
+    note: string;
+    resolvedAt?: Date;
+    createdAt: Date;
+}
 export declare const User: mongoose.Model<IUser, {}, {}, {}, mongoose.Document<unknown, {}, IUser, {}, {}> & IUser & Required<{
     _id: mongoose.Types.ObjectId;
 }> & {
@@ -234,6 +246,11 @@ export declare const Loyalty: mongoose.Model<ILoyalty, {}, {}, {}, mongoose.Docu
     __v: number;
 }, any>;
 export declare const Ticket: mongoose.Model<ITicket, {}, {}, {}, mongoose.Document<unknown, {}, ITicket, {}, {}> & ITicket & Required<{
+    _id: mongoose.Types.ObjectId;
+}> & {
+    __v: number;
+}, any>;
+export declare const SupportTicket: mongoose.Model<ISupportTicket, {}, {}, {}, mongoose.Document<unknown, {}, ISupportTicket, {}, {}> & ISupportTicket & Required<{
     _id: mongoose.Types.ObjectId;
 }> & {
     __v: number;

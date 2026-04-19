@@ -23,10 +23,11 @@ export function useSocket() {
       currentToken = token
       socketInstance = io(window.location.origin, {
         auth: { token },
-        transports: ['polling', 'websocket'],
+        transports: ['polling'],  // chỉ dùng polling cho Render free tier
         reconnection: true,
         reconnectionAttempts: Infinity,
-        reconnectionDelay: 2000,
+        reconnectionDelay: 1000,
+        timeout: 20000,
       })
       socketInstance.on('connect', () => {
         console.log('✅ socket connected')

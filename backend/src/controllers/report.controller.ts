@@ -196,6 +196,16 @@ export async function getUserBehavior(req: any, res: Response) {
         recentMovies,
         totalReviews: reviews.length,
         avgRating,
+        reviews: reviews.map((r: any) => ({
+          _id: r._id,
+          rating: r.rating,
+          comment: r.comment,
+          createdAt: r.createdAt,
+          movie: {
+            title: (r.movie as any)?.title,
+            poster: (r.movie as any)?.poster,
+          }
+        })),
       }
     });
   } catch (err: any) {

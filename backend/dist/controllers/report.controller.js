@@ -185,6 +185,16 @@ async function getUserBehavior(req, res) {
                 recentMovies,
                 totalReviews: reviews.length,
                 avgRating,
+                reviews: reviews.map((r) => ({
+                    _id: r._id,
+                    rating: r.rating,
+                    comment: r.comment,
+                    createdAt: r.createdAt,
+                    movie: {
+                        title: r.movie?.title,
+                        poster: r.movie?.poster,
+                    }
+                })),
             }
         });
     }

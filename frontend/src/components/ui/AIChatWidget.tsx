@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { movieApi } from '../../api'
+import { useAuthStore } from '../../store/authStore'
 
 interface Message {
   role: 'user' | 'assistant' | 'system'
@@ -99,6 +100,7 @@ function StaffCard({ supportMsg, setSupportMsg, supportSent, supportLoading, onS
 }
 
 export default function AIChatWidget() {
+  const { user } = useAuthStore()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -139,13 +141,20 @@ export default function AIChatWidget() {
     if (supportMsg.trim().length < 5) return
     setSupportLoading(true)
     try {
+      // Lấy token từ Zustand persist (key: 'popcorn-auth')
+      const stored = localStorage.getItem('popcorn-auth')
+      const token = stored ? JSON.parse(stored)?.state?.token : null
+
       await fetch('/api/v1/support/tickets', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ message: supportMsg, category: 'chat_escalation' }),
+        body: JSON.stringify({ 
+          message: supportMsg, 
+          category: 'chat_escalation' 
+        }),
       })
       setSupportSent(true)
     } catch {}

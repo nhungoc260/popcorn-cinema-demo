@@ -42,7 +42,7 @@ function renderMarkdown(text: string) {
 }
 
 // Card thông tin nhân viên
-function StaffCard({ supportMsg, setSupportMsg, supportSent, supportLoading, onSend, onCall }: any) {
+function StaffCard({ supportMsg, setSupportMsg, supportSent, supportLoading, onSend }: any) {
   return (
     <div className="rounded-2xl overflow-hidden mt-2"
       style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
@@ -88,12 +88,51 @@ function StaffCard({ supportMsg, setSupportMsg, supportSent, supportLoading, onS
           </div>
         )}
 
-        <p className="text-xs mb-1.5 text-center" style={{ color: 'rgba(255,255,255,0.3)' }}>— hoặc —</p>
-        <a href="tel:0765099748" onClick={onCall}
-          className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl text-xs font-semibold"
-          style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
-          📞 Gọi ngay: 0765 099 748
+        <p className="text-xs mb-2 text-center" style={{ color: 'rgba(255,255,255,0.3)' }}>— hoặc liên hệ trực tiếp —</p>
+
+        {/* Hotline */}
+        <a href="tel:0765099748"
+          className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl text-xs font-semibold mb-2"
+          style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff' }}>
+          📞 Hotline: 0765 099 748
         </a>
+
+        {/* Nhân viên Ngọc */}
+        <div className="rounded-xl p-2.5 mb-2"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p className="text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.7)' }}>👩 Ngọc</p>
+          <div className="flex gap-2">
+            <a href="tel:0708045681"
+              className="flex-1 py-1.5 rounded-lg text-xs font-medium text-center"
+              style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}>
+              📞 0708 045 681
+            </a>
+            <a href="mailto:nguyentrannhungoc260@gmail.com"
+              className="flex-1 py-1.5 rounded-lg text-xs font-medium text-center"
+              style={{ background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.25)' }}>
+              ✉️ Gmail
+            </a>
+          </div>
+        </div>
+
+        {/* Nhân viên Thắm */}
+        <div className="rounded-xl p-2.5"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p className="text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.7)' }}>👩 Thắm</p>
+          <div className="flex gap-2">
+            <a href="tel:0337109502"
+              className="flex-1 py-1.5 rounded-lg text-xs font-medium text-center"
+              style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}>
+              📞 0337 109 502
+            </a>
+            <a href="mailto:dvngoctham005@gmail.com"
+              className="flex-1 py-1.5 rounded-lg text-xs font-medium text-center"
+              style={{ background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.25)' }}>
+              ✉️ Gmail
+            </a>
+          </div>
+        </div>
+
       </div>
     </div>
   )
@@ -132,7 +171,7 @@ export default function AIChatWidget() {
     setIsStaffMode(true)
     setMessages(prev => [...prev, {
       role: 'assistant',
-      content: '👨‍💼 Mình đã kết nối bạn với nhân viên hỗ trợ!\n\nBạn có thể liên hệ trực tiếp qua các kênh bên dưới. Nhân viên sẽ hỗ trợ bạn nhanh nhất có thể!',
+      content: '👩‍💼 Mình đã kết nối bạn với nhân viên hỗ trợ!\n\nBạn có thể liên hệ trực tiếp qua các kênh bên dưới. Nhân viên sẽ hỗ trợ bạn nhanh nhất có thể!',
       isEscalated: true,
     }])
   }
@@ -141,7 +180,6 @@ export default function AIChatWidget() {
     if (supportMsg.trim().length < 5) return
     setSupportLoading(true)
     try {
-      // Lấy token từ Zustand persist (key: 'popcorn-auth')
       const stored = localStorage.getItem('popcorn-auth')
       const token = stored ? JSON.parse(stored)?.state?.token : null
 
@@ -151,12 +189,11 @@ export default function AIChatWidget() {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ 
-          message: supportMsg, 
+        body: JSON.stringify({
+          message: supportMsg,
           category: 'chat_escalation',
-          // Thêm dòng này để gửi kèm thông tin user
           userName: user?.name || undefined,
-          userEmail: user?.email || undefined, 
+          userEmail: user?.email || undefined,
         }),
       })
       setSupportSent(true)
@@ -171,7 +208,6 @@ export default function AIChatWidget() {
     setMessages(prev => [...prev, { role: 'user', content: userMsg }])
     setLoading(true)
 
-    // Auto-detect cần chuyển nhân viên
     if (shouldEscalate(userMsg)) {
       setTimeout(() => {
         setLoading(false)
@@ -212,7 +248,6 @@ export default function AIChatWidget() {
       }
       const cleanText = text.replace(/\[PHIM_ID:\s*["']?[a-f0-9]+["']?\s*\]/g, '').trim()
 
-      // AI tự nhận không giải quyết được → escalate
       const aiCannotHelp = cleanText.includes('nhân viên') || cleanText.includes('hỗ trợ trực tiếp')
 
       setMessages(prev => [...prev, {
@@ -282,7 +317,7 @@ export default function AIChatWidget() {
                   ? '0 4px 12px rgba(34,197,94,0.4)'
                   : '0 4px 12px rgba(168,85,247,0.4)',
               }}>
-              {isStaffMode ? '👨‍💼' : '🤖'}
+              {isStaffMode ? '👩‍💼' : '🤖'}
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-bold text-sm" style={{ color: '#fff' }}>
@@ -296,12 +331,11 @@ export default function AIChatWidget() {
                 </span>
               </div>
             </div>
-            {/* Nút chuyển nhân viên thủ công */}
             {!isStaffMode && (
               <button onClick={escalateToStaff}
                 className="text-xs px-2.5 py-1.5 rounded-xl font-medium transition-all hover:opacity-80 flex-shrink-0"
                 style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>
-                👨‍💼 Nhân viên
+                👩‍💼 Nhân viên
               </button>
             )}
             {isStaffMode && (
@@ -325,7 +359,7 @@ export default function AIChatWidget() {
                         ? 'linear-gradient(135deg, #22c55e, #16a34a)'
                         : 'linear-gradient(135deg, #A855F7, #7C3AED)'
                     }}>
-                    {msg.isEscalated ? '👨‍💼' : '🤖'}
+                    {msg.isEscalated ? '👩‍💼' : '🤖'}
                   </div>
                 )}
                 <div className="max-w-[80%]">
@@ -351,7 +385,6 @@ export default function AIChatWidget() {
                       supportSent={supportSent}
                       supportLoading={supportLoading}
                       onSend={sendSupportTicket}
-                      onCall={() => {}}
                     />
                   )}
 
@@ -422,11 +455,37 @@ export default function AIChatWidget() {
                 <p className="text-xs mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>
                   Đang kết nối với nhân viên hỗ trợ
                 </p>
-                <a href="tel:0765099748"
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90"
-                  style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff' }}>
-                  📞 Gọi ngay: 0765 099 748
-                </a>
+                <div className="space-y-2">
+                  <a href="tel:0765099748"
+                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold"
+                    style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff' }}>
+                    📞 Hotline: 0765 099 748
+                  </a>
+                  <div className="flex gap-2">
+                    <a href="tel:0708045681"
+                      className="flex-1 py-2 rounded-xl text-xs font-semibold text-center"
+                      style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>
+                      👩 Ngọc<br />0708 045 681
+                    </a>
+                    <a href="tel:0337109502"
+                      className="flex-1 py-2 rounded-xl text-xs font-semibold text-center"
+                      style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>
+                      👩 Thắm<br />0337 109 502
+                    </a>
+                  </div>
+                  <div className="flex gap-2">
+                    <a href="mailto:nguyentrannhungoc260@gmail.com"
+                      className="flex-1 py-2 rounded-xl text-xs font-semibold text-center"
+                      style={{ background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)' }}>
+                      ✉️ Gmail Ngọc
+                    </a>
+                    <a href="mailto:dvngoctham005@gmail.com"
+                      className="flex-1 py-2 rounded-xl text-xs font-semibold text-center"
+                      style={{ background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)' }}>
+                      ✉️ Gmail Thắm
+                    </a>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="flex gap-2 items-center">

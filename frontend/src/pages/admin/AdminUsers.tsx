@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Eye } from 'lucide-react'
+import { ArrowLeft, Eye, BarChart3 } from 'lucide-react'
 import { adminApi, analyticsApi } from '../../api'
 import toast from 'react-hot-toast'
 import UserDetailModal from '../../components/admin/UserDetailModal'
@@ -19,7 +19,6 @@ export default function AdminUsers() {
   const [page, setPage] = useState(1)
   const [roleFilter, setRoleFilter] = useState('')
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
-
   const [behaviorUserId, setBehaviorUserId] = useState<string | null>(null)
 
   const { data: behaviorData } = useQuery({
@@ -135,7 +134,6 @@ export default function AdminUsers() {
                           <span className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
                             {u.name}
                           </span>
-                          {/* Badge khoá */}
                           {u.isActive === false && (
                             <span
                               className="ml-2 text-xs px-1.5 py-0.5 rounded"
@@ -170,11 +168,30 @@ export default function AdminUsers() {
                     {/* Hành động */}
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
-                        {/* [MỚI] Nút xem chi tiết */}
+
+                        {/* Nút Eye — mở UserDetailModal */}
+                        <button
+                          onClick={() => setSelectedUserId(u._id)}
+                          className="p-1.5 rounded-lg transition-all"
+                          title="Xem chi tiết"
+                          style={{ color: 'var(--color-text-muted)', background: 'transparent' }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.color = 'var(--color-primary)'
+                            e.currentTarget.style.background = 'rgba(168,85,247,0.1)'
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.color = 'var(--color-text-muted)'
+                            e.currentTarget.style.background = 'transparent'
+                          }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+
+                        {/* Nút BarChart3 — mở modal phân tích hành vi */}
                         <button
                           onClick={() => setBehaviorUserId(u._id)}
                           className="p-1.5 rounded-lg transition-all"
-                          title="Xem hành vi"
+                          title="Phân tích hành vi"
                           style={{ color: 'var(--color-text-muted)', background: 'transparent' }}
                           onMouseEnter={e => {
                             e.currentTarget.style.color = '#F472B6'
@@ -185,10 +202,10 @@ export default function AdminUsers() {
                             e.currentTarget.style.background = 'transparent'
                           }}
                         >
-                          📊
+                          <BarChart3 className="w-4 h-4" />
                         </button>
 
-                        {/* Select vai trò — giữ nguyên */}
+                        {/* Select vai trò */}
                         <select
                           value={u.role}
                           onChange={e => changeRole({ id: u._id, role: e.target.value })}
@@ -213,25 +230,34 @@ export default function AdminUsers() {
         )}
       </div>
 
+      {/* Modal phân tích hành vi */}
       {behaviorUserId && behavior && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.75)' }}
-          onClick={() => setBehaviorUserId(null)}>
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+          onClick={() => setBehaviorUserId(null)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
             className="w-full max-w-md rounded-3xl p-6 space-y-4 overflow-y-auto max-h-[80vh]"
             style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}
-            onClick={e => e.stopPropagation()}>
-
+            onClick={e => e.stopPropagation()}
+          >
             {/* Header */}
             <div className="flex items-center justify-between">
               <h2 className="font-bold" style={{ color: 'var(--color-text)' }}>📊 Phân tích hành vi</h2>
-              <button onClick={() => setBehaviorUserId(null)}
-                style={{ color: 'var(--color-text-muted)', fontSize: 18 }}>✕</button>
+              <button
+                onClick={() => setBehaviorUserId(null)}
+                style={{ color: 'var(--color-text-muted)', fontSize: 18 }}
+              >✕</button>
             </div>
 
             {/* Persona */}
-            <div className="p-4 rounded-2xl"
-              style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
+            <div
+              className="p-4 rounded-2xl"
+              style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}
+            >
               <div className="font-semibold" style={{ color: 'var(--color-primary)' }}>{behavior.persona}</div>
               <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
                 {behavior.totalMovies} phim · {(behavior.totalSpent || 0).toLocaleString('vi')}đ · Đánh giá TB {behavior.avgRating}/10
@@ -245,8 +271,11 @@ export default function AdminUsers() {
                 { label: 'Đánh giá', value: behavior.totalReviews },
                 { label: 'Đi cùng TB', value: behavior.avgSeatsPerBooking + ' người' },
               ].map(({ label, value }) => (
-                <div key={label} className="p-3 rounded-xl text-center"
-                  style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}>
+                <div
+                  key={label}
+                  className="p-3 rounded-xl text-center"
+                  style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}
+                >
                   <div className="font-black text-lg" style={{ color: 'var(--color-primary)' }}>{value}</div>
                   <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{label}</div>
                 </div>
@@ -263,8 +292,10 @@ export default function AdminUsers() {
                     <span style={{ color: 'var(--color-text-muted)' }}>{g.pct}%</span>
                   </div>
                   <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                    <div className="h-full rounded-full"
-                      style={{ width: `${g.pct}%`, background: 'linear-gradient(90deg, var(--color-primary), #FDE68A)' }} />
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${g.pct}%`, background: 'linear-gradient(90deg, var(--color-primary), #FDE68A)' }}
+                    />
                   </div>
                 </div>
               ))}
@@ -272,8 +303,10 @@ export default function AdminUsers() {
 
             {/* Favorite theater */}
             {behavior.favoriteTheater && (
-              <div className="text-sm flex items-center gap-2 pt-2"
-                style={{ borderTop: '1px solid var(--color-glass-border)' }}>
+              <div
+                className="text-sm flex items-center gap-2 pt-2"
+                style={{ borderTop: '1px solid var(--color-glass-border)' }}
+              >
                 <span>🏛</span>
                 <div>
                   <span style={{ color: 'var(--color-text-muted)' }}>Rạp yêu thích: </span>
@@ -282,12 +315,11 @@ export default function AdminUsers() {
                 </div>
               </div>
             )}
-
           </motion.div>
         </div>
       )}
 
-      {/* [MỚI] Modal chi tiết user */}
+      {/* Modal chi tiết user */}
       {selectedUserId && (
         <UserDetailModal
           userId={selectedUserId}

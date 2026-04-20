@@ -9,7 +9,7 @@ r.use(errorHandler_1.authenticate);
 r.get('/revenue', (0, errorHandler_1.authorize)('admin', 'staff'), report_controller_1.getRevenueReport);
 // Chỉ Admin mới xem occupancy
 r.get('/occupancy', (0, errorHandler_1.authorize)('admin'), report_controller_1.getOccupancyReport);
-r.get('/user-behavior/:userId', (0, errorHandler_1.authorize)('admin', 'staff'), report_controller_1.getUserBehavior);
+r.get('/user-behavior/:userId', report_controller_1.getUserBehavior);
 r.get('/admin/user-trends', (0, errorHandler_1.authorize)('admin'), report_controller_1.getUserTrends);
 exports.default = r;
 //# sourceMappingURL=report.routes.js.map

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, TrendingUp, Users, Ticket, DollarSign, BarChart3, Film, RefreshCw } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import api from '../../api'
+import api, { analyticsApi } from '../../api'
 
 const fmtM = (n: number) => {
   if (n >= 1e9) return `${(n/1e9).toFixed(1)}B`
@@ -149,6 +149,13 @@ function printReport(report: any, revenue: any[], period: string, stats: any) {
 
 export default function AdminReports() {
   const [period, setPeriod] = useState('month')
+
+  const { data: trendsData } = useQuery({
+    queryKey: ['user-trends'],
+    queryFn: () => analyticsApi.getUserTrends(),
+    select: (d: any) => d.data.data,
+  });
+  const trends = trendsData as any;
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['admin-reports', period],
@@ -423,6 +430,84 @@ export default function AdminReports() {
             </div>
           </motion.div>
         </div>
+
+        {/* User Trends Section */}
+        {trends && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
+            className="p-6 rounded-2xl space-y-5"
+            style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+
+            <h2 className="font-bold flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
+              <Users className="w-4 h-4" style={{ color: '#F472B6' }} /> Xu Hướng Hành Vi Người Dùng
+            </h2>
+
+            {/* Retention + User Groups */}
+            <div className="grid grid-cols-4 gap-3">
+              <div className="p-4 rounded-xl text-center col-span-1"
+                style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                <div className="font-black text-2xl" style={{ color: '#34D399' }}>{trends.retentionRate}%</div>
+                <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>Tỷ lệ quay lại</div>
+              </div>
+              {[
+                { label: 'Khách mới',       value: trends.userGroups?.casual  || 0, color: '#FDE68A' },
+                { label: 'Thường xuyên',    value: trends.userGroups?.regular || 0, color: 'var(--color-primary)' },
+                { label: 'Trung thành',     value: trends.userGroups?.loyal   || 0, color: '#F472B6' },
+              ].map(({ label, value, color }) => (
+                <div key={label} className="p-4 rounded-xl text-center"
+                  style={{ background: `${color}0a`, border: `1px solid ${color}25` }}>
+                  <div className="font-black text-2xl" style={{ color }}>{value}</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Genre Trends */}
+            <div>
+              <div className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text-muted)' }}>
+                Thể loại phổ biến toàn hệ thống
+              </div>
+              <div className="space-y-2">
+                {(trends.genreTrends || []).map((g: any, i: number) => {
+                  const maxCount = trends.genreTrends[0]?.count || 1;
+                  const pct = Math.round(g.count / maxCount * 100);
+                  return (
+                    <div key={g._id}>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span style={{ color: 'var(--color-text)' }}>{g._id}</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{g.count} lượt</span>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
+                          transition={{ duration: 0.8, delay: i * 0.05 }}
+                          className="h-full rounded-full"
+                          style={{ background: i === 0 ? 'var(--color-primary)' : 'rgba(168,85,247,0.45)' }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Peak Hours mini chart dùng recharts đã import sẵn */}
+            <div>
+              <div className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text-muted)' }}>
+                Giờ cao điểm toàn hệ thống
+              </div>
+              <ResponsiveContainer width="100%" height={100}>
+                <BarChart data={(trends.peakHours || []).filter((_: any, i: number) => i >= 8 && i <= 23)}
+                  margin={{ top: 0, right: 0, left: 0, bottom: 0 }} barCategoryGap="20%">
+                  <XAxis dataKey="hour" tick={{ fontSize: 10, fill: 'var(--color-text-dim)' }}
+                    axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}h`} />
+                  <Tooltip
+                    contentStyle={{ background: 'var(--color-bg-2)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 8, fontSize: 11 }}
+                    formatter={(v: number) => [`${v} booking`, 'Lượt đặt']} />
+                  <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={20} fill="rgba(168,85,247,0.5)" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+          </motion.div>
+        )}
 
         {/* Admin quick links */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}

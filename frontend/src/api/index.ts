@@ -173,4 +173,10 @@ export const reportApi = {
   getOccupancy: () => api.get('/reports/occupancy'),
 }
 
+export const analyticsApi = {
+  getMyBehavior:    () => api.get('/reports/user-behavior/me'),
+  getUserBehavior:  (id: string) => api.get(`/reports/user-behavior/${id}`),
+  getUserTrends:    () => api.get('/reports/admin/user-trends'),
+};
+
 export default api

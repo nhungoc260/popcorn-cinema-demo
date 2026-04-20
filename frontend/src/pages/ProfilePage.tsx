@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { User, Mail, Phone, Save, Camera, Ticket, Star, Calendar, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react'
+import { User, Mail, Phone, Save, Camera, Ticket, Star, Calendar, Lock, Eye, EyeOff, ShieldCheck, BarChart3 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
-import api, { bookingApi } from '../api'
+import api, { bookingApi, analyticsApi } from '../api'
 import toast from 'react-hot-toast'
 
 const GENDER_OPTIONS = ['Nam', 'Nữ', 'Khác']
@@ -16,7 +16,7 @@ const TIER_CONFIG = {
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuthStore()
-  const [tab, setTab] = useState<'info' | 'security' | 'bookings'>('info')
+  const [tab, setTab] = useState<'info' | 'security' | 'bookings' | 'analytics'>('info')
   const [form, setForm] = useState({
     name: user?.name || '',
     phone: '',
@@ -56,6 +56,14 @@ export default function ProfilePage() {
     enabled: tab === 'bookings',
   })
 
+  const { data: behaviorData } = useQuery({
+    queryKey: ['my-behavior'],
+    queryFn: () => analyticsApi.getMyBehavior(),
+    select: (d: any) => d.data.data,
+    enabled: tab === 'analytics',
+  });
+  const behavior = behaviorData as any;
+
   // Load loyalty points
   const { data: loyaltyData } = useQuery({
     queryKey: ['my-loyalty'],
@@ -92,9 +100,10 @@ export default function ProfilePage() {
   const confirmedBookings = bookings.filter((b: any) => b.status === 'confirmed' || b.status === 'checked_in').length
 
   const TABS = [
-    { id: 'info', label: 'Thông Tin', icon: User },
-    { id: 'security', label: 'Bảo Mật', icon: Lock },
-    { id: 'bookings', label: 'Lịch Sử Vé', icon: Ticket },
+    { id: 'info',      label: 'Thông Tin',   icon: User },
+    { id: 'security',  label: 'Bảo Mật',     icon: Lock },
+    { id: 'bookings',  label: 'Lịch Sử Vé',  icon: Ticket },
+    { id: 'analytics', label: 'Phân Tích',   icon: BarChart3 },
   ]
 
   const inputClass = "w-full pl-10 pr-4 py-3 rounded-xl text-sm outline-none transition-all"
@@ -498,6 +507,110 @@ export default function ProfilePage() {
               )
             })}
           </motion.div>
+        )}
+        {tab === 'analytics' && behavior && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+
+            {/* Persona */}
+            <div className="p-5 rounded-2xl flex items-center gap-4"
+              style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+              <div className="text-4xl">🎬</div>
+              <div>
+                <div className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>Phong cách xem phim của bạn</div>
+                <div className="font-bold text-lg" style={{ color: 'var(--color-primary)' }}>{behavior.persona}</div>
+                <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                  Dựa trên {behavior.totalMovies} phim đã xem · Đánh giá TB {behavior.avgRating}/10
+                </div>
+              </div>
+            </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Phim đã xem',    value: behavior.totalMovies },
+                { label: 'Tổng chi tiêu',  value: (behavior.totalSpent || 0).toLocaleString('vi') + 'đ' },
+                { label: 'Đi cùng TB',     value: behavior.avgSeatsPerBooking + ' người' },
+              ].map(({ label, value }) => (
+                <div key={label} className="p-4 rounded-2xl text-center"
+                  style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+                  <div className="font-black text-xl" style={{ color: 'var(--color-primary)' }}>{value}</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Thể loại yêu thích */}
+            <div className="p-5 rounded-2xl"
+              style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+              <div className="font-semibold mb-4" style={{ color: 'var(--color-text)' }}>Thể loại yêu thích</div>
+              <div className="space-y-3">
+                {(behavior.favoriteGenres || []).map((g: any) => (
+                  <div key={g.genre}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span style={{ color: 'var(--color-text)' }}>{g.genre}</span>
+                      <span style={{ color: 'var(--color-text-muted)' }}>{g.pct}%</span>
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${g.pct}%` }}
+                        transition={{ duration: 0.8 }} className="h-full rounded-full"
+                        style={{ background: 'linear-gradient(90deg, var(--color-primary), #FDE68A)' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Rạp yêu thích + phim gần đây */}
+            {behavior.favoriteTheater && (
+              <div className="p-5 rounded-2xl flex items-center gap-3"
+                style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+                <div className="text-2xl">🏛</div>
+                <div>
+                  <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Rạp yêu thích</div>
+                  <div className="font-semibold" style={{ color: 'var(--color-text)' }}>{behavior.favoriteTheater.name}</div>
+                  <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{behavior.favoriteTheater.count} lần ghé thăm</div>
+                </div>
+              </div>
+            )}
+
+            {/* Phim gần đây */}
+            <div className="p-5 rounded-2xl"
+              style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+              <div className="font-semibold mb-3" style={{ color: 'var(--color-text)' }}>Phim đã xem gần đây</div>
+              <div className="space-y-3">
+                {(behavior.recentMovies || []).map((m: any, i: number) => (
+                  <div key={i} className="flex items-center gap-3">
+                    {m.poster && <img src={m.poster} alt="" className="w-10 h-14 object-cover rounded-lg flex-shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold truncate" style={{ color: 'var(--color-text)' }}>{m.title}</div>
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                        {m.theater} · {new Date(m.watchedAt).toLocaleDateString('vi-VN')}
+                      </div>
+                      <div className="flex gap-1 mt-1 flex-wrap">
+                        {(m.genres || []).slice(0, 2).map((g: string) => (
+                          <span key={g} className="text-xs px-2 py-0.5 rounded-full"
+                            style={{ background: 'rgba(168,85,247,0.1)', color: 'var(--color-primary)' }}>{g}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="text-xs font-bold flex-shrink-0" style={{ color: '#FDE68A' }}>
+                      {(m.paidAmount || 0).toLocaleString('vi')}đ
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </motion.div>
+        )}
+
+        {tab === 'analytics' && !behavior && (
+          <div className="text-center py-16 rounded-3xl"
+            style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+            <div className="text-5xl mb-3">📊</div>
+            <p style={{ color: 'var(--color-text-muted)' }}>Chưa có dữ liệu phân tích</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>Đặt vé để xem thống kê của bạn!</p>
+          </div>
         )}
       </div>
     </div>

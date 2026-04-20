@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getRevenueReport = getRevenueReport;
 exports.getOccupancyReport = getOccupancyReport;
+exports.getUserBehavior = getUserBehavior;
+exports.getUserTrends = getUserTrends;
 const models_1 = require("../models");
 // GET /admin/reports/revenue?period=day|week|month|year
 async function getRevenueReport(req, res) {
@@ -88,6 +90,163 @@ async function getOccupancyReport(req, res) {
                 : 0,
         }));
         return res.json({ success: true, data });
+    }
+    catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+}
+// GET /reports/user-behavior/:userId
+async function getUserBehavior(req, res) {
+    try {
+        const targetId = req.params.userId === 'me' ? req.user.id : req.params.userId;
+        const bookings = await models_1.Booking.find({
+            user: targetId,
+            status: { $in: ['confirmed', 'checked_in'] }
+        })
+            .populate({ path: 'showtime', populate: [
+                { path: 'movie', select: 'title genres poster duration' },
+                { path: 'theater', select: 'name city' },
+            ] })
+            .lean();
+        const totalSpent = bookings.reduce((s, b) => s + (b.paidAmount || b.totalAmount), 0);
+        const genreCount = {};
+        bookings.forEach(b => {
+            const movie = b.showtime?.movie;
+            (movie?.genres || []).forEach((g) => {
+                genreCount[g] = (genreCount[g] || 0) + 1;
+            });
+        });
+        const favoriteGenres = Object.entries(genreCount)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([genre, count]) => ({
+            genre,
+            count,
+            pct: bookings.length ? Math.round(count / bookings.length * 100) : 0
+        }));
+        const personaMap = {
+            'Hành động': 'Tín đồ phim hành động',
+            'Kinh dị': 'Người yêu thích cảm giác mạnh',
+            'Hài': 'Người thích giải trí',
+            'Tâm lý': 'Cinephile',
+            'Khoa học viễn tưởng': 'Người mê Sci-Fi',
+            'Hoạt hình': 'Người yêu gia đình',
+        };
+        const topGenre = favoriteGenres[0]?.genre || '';
+        const persona = personaMap[topGenre] || 'Người xem đa dạng';
+        const hourDist = Array(24).fill(0);
+        const weekdayDist = Array(7).fill(0);
+        bookings.forEach(b => {
+            const d = new Date(b.showtime?.startTime);
+            if (!isNaN(d.getTime())) {
+                hourDist[d.getHours()]++;
+                weekdayDist[d.getDay()]++;
+            }
+        });
+        const theaterCount = {};
+        bookings.forEach(b => {
+            const name = b.showtime?.theater?.name;
+            if (name)
+                theaterCount[name] = (theaterCount[name] || 0) + 1;
+        });
+        const favoriteTheater = Object.entries(theaterCount).sort((a, b) => b[1] - a[1])[0];
+        const avgSeats = bookings.length
+            ? +(bookings.reduce((s, b) => s + b.seats.length, 0) / bookings.length).toFixed(1)
+            : 0;
+        const recentMovies = [...bookings]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 10)
+            .map(b => ({
+            title: b.showtime?.movie?.title,
+            poster: b.showtime?.movie?.poster,
+            genres: b.showtime?.movie?.genres,
+            watchedAt: b.createdAt,
+            theater: b.showtime?.theater?.name,
+            paidAmount: b.paidAmount || b.totalAmount,
+        }));
+        const reviews = await models_1.Review.find({ user: targetId })
+            .populate('movie', 'title poster genres').lean();
+        const avgRating = reviews.length
+            ? +(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+            : 0;
+        return res.json({
+            success: true,
+            data: {
+                totalMovies: bookings.length,
+                totalSpent,
+                persona,
+                favoriteGenres,
+                hourDistribution: hourDist,
+                weekdayDistribution: weekdayDist,
+                favoriteTheater: favoriteTheater
+                    ? { name: favoriteTheater[0], count: favoriteTheater[1] }
+                    : null,
+                avgSeatsPerBooking: avgSeats,
+                recentMovies,
+                totalReviews: reviews.length,
+                avgRating,
+            }
+        });
+    }
+    catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+}
+// GET /reports/admin/user-trends
+async function getUserTrends(req, res) {
+    try {
+        const genreTrends = await models_1.Booking.aggregate([
+            { $match: { status: { $in: ['confirmed', 'checked_in'] } } },
+            { $lookup: { from: 'showtimes', localField: 'showtime', foreignField: '_id', as: 'st' } },
+            { $unwind: '$st' },
+            { $lookup: { from: 'movies', localField: 'st.movie', foreignField: '_id', as: 'movie' } },
+            { $unwind: '$movie' },
+            { $unwind: '$movie.genres' },
+            { $group: { _id: '$movie.genres', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 8 }
+        ]);
+        const peakHoursRaw = await models_1.Booking.aggregate([
+            { $match: { status: { $in: ['confirmed', 'checked_in'] } } },
+            { $lookup: { from: 'showtimes', localField: 'showtime', foreignField: '_id', as: 'st' } },
+            { $unwind: '$st' },
+            { $group: { _id: { $hour: { date: '$st.startTime', timezone: '+07:00' } }, count: { $sum: 1 } } },
+            { $sort: { _id: 1 } }
+        ]);
+        const userGroupsRaw = await models_1.Booking.aggregate([
+            { $match: { status: { $in: ['confirmed', 'checked_in'] } } },
+            { $group: { _id: '$user', totalBookings: { $sum: 1 } } },
+            { $group: {
+                    _id: null,
+                    casual: { $sum: { $cond: [{ $lte: ['$totalBookings', 2] }, 1, 0] } },
+                    regular: { $sum: { $cond: [{ $and: [{ $gt: ['$totalBookings', 2] }, { $lte: ['$totalBookings', 6] }] }, 1, 0] } },
+                    loyal: { $sum: { $cond: [{ $gt: ['$totalBookings', 6] }, 1, 0] } },
+                } }
+        ]);
+        const retentionData = await models_1.Booking.aggregate([
+            { $match: { status: { $in: ['confirmed', 'checked_in'] } } },
+            { $group: { _id: '$user', count: { $sum: 1 } } },
+            { $group: {
+                    _id: null,
+                    total: { $sum: 1 },
+                    returning: { $sum: { $cond: [{ $gte: ['$count', 2] }, 1, 0] } }
+                } }
+        ]);
+        const retention = retentionData[0]
+            ? Math.round(retentionData[0].returning / retentionData[0].total * 100)
+            : 0;
+        return res.json({
+            success: true,
+            data: {
+                genreTrends,
+                peakHours: Array(24).fill(0).map((_, h) => ({
+                    hour: h,
+                    count: peakHoursRaw.find((p) => p._id === h)?.count || 0
+                })),
+                userGroups: userGroupsRaw[0] || { casual: 0, regular: 0, loyal: 0 },
+                retentionRate: retention,
+            }
+        });
     }
     catch (err) {
         return res.status(500).json({ success: false, message: err.message });

@@ -1,7 +1,11 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateTicket = exports.getTickets = exports.createTicket = void 0;
 const models_1 = require("../models");
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 async function genTicketId() {
     const count = await models_1.SupportTicket.countDocuments();
     return `SP${String(count + 1).padStart(4, '0')}`;
@@ -13,13 +17,32 @@ const createTicket = async (req, res) => {
         if (!message || message.trim().length < 5) {
             return res.status(400).json({ success: false, message: 'Vui lòng mô tả vấn đề' });
         }
-        const dbUser = req.user?.id
-            ? await models_1.User.findById(req.user.id).select('name email').lean()
-            : null;
+        // Thử lấy user từ req.user (nếu có authenticate)
+        // hoặc decode token thủ công từ header (route không có authenticate)
+        let dbUser = null;
+        let userId = null;
+        if (req.user?.id) {
+            userId = req.user.id;
+            dbUser = await models_1.User.findById(userId).select('name email').lean();
+        }
+        else {
+            const authHeader = req.headers.authorization;
+            if (authHeader?.startsWith('Bearer ')) {
+                try {
+                    const token = authHeader.split(' ')[1];
+                    const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
+                    userId = decoded.id;
+                    dbUser = await models_1.User.findById(userId).select('name email').lean();
+                }
+                catch {
+                    // Token không hợp lệ → khách vãng lai
+                }
+            }
+        }
         const ticketId = await genTicketId();
         const ticket = await models_1.SupportTicket.create({
             ticketId,
-            userId: req.user?.id || null,
+            userId: userId || null,
             userName: dbUser?.name || 'Khách vãng lai',
             userEmail: dbUser?.email || '',
             message: message.trim(),

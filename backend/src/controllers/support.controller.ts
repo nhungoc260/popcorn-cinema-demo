@@ -1,6 +1,7 @@
 import { Response } from 'express'
 import { AuthRequest } from '../middleware/errorHandler'
 import { User, SupportTicket } from '../models'
+import jwt from 'jsonwebtoken'
 
 async function genTicketId(): Promise<string> {
   const count = await SupportTicket.countDocuments()
@@ -15,15 +16,33 @@ export const createTicket = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, message: 'Vui lòng mô tả vấn đề' })
     }
 
-    const dbUser = req.user?.id
-      ? await User.findById(req.user.id).select('name email').lean() as any
-      : null
+    // Thử lấy user từ req.user (nếu có authenticate)
+    // hoặc decode token thủ công từ header (route không có authenticate)
+    let dbUser: any = null
+    let userId: string | null = null
+
+    if (req.user?.id) {
+      userId = req.user.id
+      dbUser = await User.findById(userId).select('name email').lean()
+    } else {
+      const authHeader = req.headers.authorization
+      if (authHeader?.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split(' ')[1]
+          const decoded: any = jwt.verify(token, process.env.JWT_SECRET!)
+          userId = decoded.id
+          dbUser = await User.findById(userId).select('name email').lean()
+        } catch {
+          // Token không hợp lệ → khách vãng lai
+        }
+      }
+    }
 
     const ticketId = await genTicketId()
 
     const ticket = await SupportTicket.create({
       ticketId,
-      userId:    req.user?.id || null,
+      userId:    userId || null,
       userName:  dbUser?.name || 'Khách vãng lai',
       userEmail: dbUser?.email || '',
       message:   message.trim(),

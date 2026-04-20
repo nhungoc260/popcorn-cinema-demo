@@ -19,7 +19,11 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState('')
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [behaviorUserId, setBehaviorUserId] = useState<string | null>(null)
-  const [showReviews, setShowReviews] = useState(false)  // ✅ thêm
+  const [showReviews, setShowReviews] = useState(false)
+  const [showMovies, setShowMovies] = useState(false)
+  const [showBookings, setShowBookings] = useState(false) 
+
+  const resetViews = () => { setShowReviews(false); setShowMovies(false); setShowBookings(false) }
 
   const { data: behaviorData } = useQuery({
     queryKey: ['user-behavior', behaviorUserId],
@@ -186,7 +190,10 @@ export default function AdminUsers() {
                         </button>
 
                         <button
-                          onClick={() => { setBehaviorUserId(u._id); setShowReviews(false) }}
+                          onClick={() => {
+                            setBehaviorUserId(u._id)
+                            resetViews()
+                          }}
                           className="p-1.5 rounded-lg transition-all"
                           title="Phân tích hành vi"
                           style={{ color: 'var(--color-text-muted)', background: 'transparent' }}
@@ -231,7 +238,7 @@ export default function AdminUsers() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.75)' }}
-          onClick={() => { setBehaviorUserId(null); setShowReviews(false) }}
+          onClick={() => { setBehaviorUserId(null); setShowReviews(false); setShowMovies(false); setShowBookings(false) }}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -243,27 +250,24 @@ export default function AdminUsers() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {/* ✅ Nút back khi đang xem reviews */}
-                {showReviews && (
-                  <button
-                    onClick={() => setShowReviews(false)}
-                    className="p-1 rounded-lg"
-                    style={{ color: 'var(--color-text-muted)' }}
-                  >
+                {(showReviews || showMovies || showBookings) && (
+                  <button onClick={resetViews} className="p-1 rounded-lg" style={{ color: 'var(--color-text-muted)' }}>
                     <ArrowLeft className="w-4 h-4" />
                   </button>
                 )}
                 <h2 className="font-bold" style={{ color: 'var(--color-text)' }}>
-                  {showReviews ? '⭐ Đánh giá' : '📊 Phân tích hành vi'}
+                  {showMovies ? '🎬 Phim đã xem'
+                    : showBookings ? '🎟 Lịch sử booking'
+                    : showReviews  ? '⭐ Đánh giá'
+                    : '📊 Phân tích hành vi'}
                 </h2>
               </div>
               <button
-                onClick={() => { setBehaviorUserId(null); setShowReviews(false) }}
+                onClick={() => { setBehaviorUserId(null); setShowReviews(false); setShowMovies(false); setShowBookings(false) }}
                 style={{ color: 'var(--color-text-muted)', fontSize: 18 }}
               >✕</button>
             </div>
 
-            {/* ✅ Khi showReviews = false: hiển thị phân tích hành vi như cũ */}
             {!showReviews && (
               <>
                 {/* Persona */}
@@ -280,29 +284,25 @@ export default function AdminUsers() {
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { label: 'Phim đã xem', value: behavior.totalMovies, clickable: false },
-                    { label: 'Đánh giá', value: behavior.totalReviews, clickable: true },
-                    { label: 'Đi cùng TB', value: behavior.avgSeatsPerBooking + ' người', clickable: false },
-                  ].map(({ label, value, clickable }) => (
+                    { label: 'Phim đã xem', value: behavior.totalMovies,                   clickable: true, onClick: () => setShowMovies(true) },
+                    { label: 'Đánh giá',    value: behavior.totalReviews,                   clickable: true, onClick: () => setShowReviews(true) },
+                    { label: 'Đi cùng TB',  value: behavior.avgSeatsPerBooking + ' người', clickable: true, onClick: () => setShowBookings(true) },
+                  ].map(({ label, value, clickable, onClick }) => (
                     <div
                       key={label}
-                      onClick={() => clickable && setShowReviews(true)}
+                      onClick={() => clickable && onClick()}
                       className="p-3 rounded-xl text-center transition-all"
                       style={{
                         background: 'var(--color-bg-3)',
-                        border: `1px solid ${clickable ? 'rgba(168,85,247,0.35)' : 'var(--color-glass-border)'}`,
-                        cursor: clickable ? 'pointer' : 'default',
+                        border: '1px solid rgba(168,85,247,0.35)',
+                        cursor: 'pointer',
                       }}
-                      onMouseEnter={e => {
-                        if (clickable) e.currentTarget.style.background = 'rgba(168,85,247,0.12)'
-                      }}
-                      onMouseLeave={e => {
-                        if (clickable) e.currentTarget.style.background = 'var(--color-bg-3)'
-                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.12)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg-3)' }}
                     >
                       <div className="font-black text-lg" style={{ color: 'var(--color-primary)' }}>{value}</div>
-                      <div className="text-xs mt-0.5" style={{ color: clickable ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
-                        {label}{clickable ? ' →' : ''}
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--color-primary)' }}>
+                        {label} →
                       </div>
                     </div>
                   ))}
@@ -391,6 +391,68 @@ export default function AdminUsers() {
                 })}
               </div>
             )}
+
+            {/* View: Phim đã xem */}
+            {showMovies && (
+              <div className="space-y-3">
+                {(behavior.recentMovies || []).length === 0 && (
+                  <div className="text-center py-6 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                    Chưa có phim nào
+                  </div>
+                )}
+                {(behavior.recentMovies || []).map((m: any, i: number) => (
+                  <div
+                    key={i}
+                    className="p-3 rounded-xl flex items-center gap-3"
+                    style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}
+                  >
+                    {m.poster && (
+                      <img src={m.poster} alt="" className="w-10 h-14 object-cover rounded-lg flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold truncate" style={{ color: 'var(--color-text)' }}>
+                        🎬 {m.title}
+                      </div>
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                        {m.genres?.join(', ')}
+                      </div>
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                        📅 {new Date(m.watchedAt).toLocaleDateString('vi-VN')}
+                        {m.theater && <span> · 🏛 {m.theater}</span>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* View: Lịch sử booking */}
+            {showBookings && (
+              <div className="space-y-3">
+                {(behavior.bookings || []).length === 0 && (
+                  <div className="text-center py-6 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                    Chưa có booking nào
+                  </div>
+                )}
+                {(behavior.bookings || []).map((b: any) => (
+                  <div
+                    key={b._id}
+                    className="p-3 rounded-xl space-y-1.5"
+                    style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}
+                  >
+                    <div className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+                      🎬 {b.movie?.title || 'Phim không xác định'}
+                    </div>
+                    <div className="flex items-center gap-3 flex-wrap text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      <span>📅 {new Date(b.showtime?.startTime).toLocaleDateString('vi-VN')}</span>
+                      <span>💺 {b.seats?.length || 0} ghế</span>
+                      <span>💰 {(b.totalPrice || 0).toLocaleString('vi')}đ</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
           </motion.div>
         </div>
       )}

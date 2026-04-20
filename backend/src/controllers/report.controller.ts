@@ -180,6 +180,23 @@ export async function getUserBehavior(req: any, res: Response) {
       ? +(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
       : 0;
 
+    // Thêm mapping bookings để trả về frontend
+    const bookingList = [...bookings]
+      .sort((a, b) => new Date((b as any).createdAt).getTime() - new Date((a as any).createdAt).getTime())
+      .slice(0, 20)
+      .map(b => ({
+        _id: (b as any)._id,
+        movie: {
+          title: (b.showtime as any)?.movie?.title,
+          poster: (b.showtime as any)?.movie?.poster,
+        },
+        showtime: {
+          startTime: (b.showtime as any)?.startTime,
+        },
+        seats: b.seats,
+        totalPrice: b.paidAmount || b.totalAmount,
+      }));
+
     return res.json({
       success: true,
       data: {
@@ -193,7 +210,8 @@ export async function getUserBehavior(req: any, res: Response) {
           ? { name: favoriteTheater[0], count: favoriteTheater[1] }
           : null,
         avgSeatsPerBooking: avgSeats,
-        recentMovies,
+        recentMovies,       // phim đã xem (đã có)
+        bookings: bookingList, // ✅ thêm mới
         totalReviews: reviews.length,
         avgRating,
         reviews: reviews.map((r: any) => ({

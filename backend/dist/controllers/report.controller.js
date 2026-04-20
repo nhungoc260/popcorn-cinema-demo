@@ -169,6 +169,22 @@ async function getUserBehavior(req, res) {
         const avgRating = reviews.length
             ? +(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
             : 0;
+        // Thêm mapping bookings để trả về frontend
+        const bookingList = [...bookings]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 20)
+            .map(b => ({
+            _id: b._id,
+            movie: {
+                title: b.showtime?.movie?.title,
+                poster: b.showtime?.movie?.poster,
+            },
+            showtime: {
+                startTime: b.showtime?.startTime,
+            },
+            seats: b.seats,
+            totalPrice: b.paidAmount || b.totalAmount,
+        }));
         return res.json({
             success: true,
             data: {
@@ -182,7 +198,8 @@ async function getUserBehavior(req, res) {
                     ? { name: favoriteTheater[0], count: favoriteTheater[1] }
                     : null,
                 avgSeatsPerBooking: avgSeats,
-                recentMovies,
+                recentMovies, // phim đã xem (đã có)
+                bookings: bookingList, // ✅ thêm mới
                 totalReviews: reviews.length,
                 avgRating,
                 reviews: reviews.map((r) => ({

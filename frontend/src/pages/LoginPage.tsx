@@ -33,7 +33,9 @@ export default function LoginPage() {
   const { setAuth, token, user } = useAuthStore()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as any)?.from || '/'
+  const from = (location.state as any)?.from 
+  || localStorage.getItem('redirectAfterLogin') 
+  || '/'
 
   // Already logged in
   if (token && user) {
@@ -43,6 +45,7 @@ export default function LoginPage() {
   }
 
   const doRedirect = (u: any) => {
+    localStorage.removeItem('redirectAfterLogin')
     toast.success(`Chào mừng, ${u.name}! 🎬`)
     if (u.role === 'admin') navigate('/admin', { replace: true })
     else if (u.role === 'staff') navigate('/staff/counter', { replace: true })

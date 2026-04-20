@@ -63,7 +63,7 @@ function PrivateRoute({
       localStorage.setItem('pendingGroupRoom', groupRoom)
     }
 
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" state={{ from: currentUrl }} replace />
   }
 
   if (roles && user && !roles.includes(user.role)) {
@@ -82,7 +82,7 @@ function AdminLayoutGuard({ roles }: { roles?: string[] }) {
   if (!token) {
     const currentUrl = window.location.pathname + window.location.search
     localStorage.setItem('redirectAfterLogin', currentUrl)
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" state={{ from: currentUrl }} replace />
   }
 
   if (roles && user && !roles.includes(user.role)) {

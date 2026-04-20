@@ -42,9 +42,9 @@ export const createTicket = async (req: AuthRequest, res: Response) => {
 
     const ticket = await SupportTicket.create({
       ticketId,
-      userId:    userId || null,
-      userName:  dbUser?.name || 'Khách vãng lai',
-      userEmail: dbUser?.email || '',
+      userId: userId || null,
+      userName: dbUser?.name || req.body.userName || 'Khách vãng lai',
+      userEmail: dbUser?.email || req.body.userEmail || '',
       message:   message.trim(),
       category:  category || 'general',
       status:    'pending',

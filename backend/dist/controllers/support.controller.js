@@ -43,8 +43,8 @@ const createTicket = async (req, res) => {
         const ticket = await models_1.SupportTicket.create({
             ticketId,
             userId: userId || null,
-            userName: dbUser?.name || 'Khách vãng lai',
-            userEmail: dbUser?.email || '',
+            userName: dbUser?.name || req.body.userName || 'Khách vãng lai',
+            userEmail: dbUser?.email || req.body.userEmail || '',
             message: message.trim(),
             category: category || 'general',
             status: 'pending',

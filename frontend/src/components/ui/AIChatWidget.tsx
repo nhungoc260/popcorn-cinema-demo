@@ -153,7 +153,10 @@ export default function AIChatWidget() {
         },
         body: JSON.stringify({ 
           message: supportMsg, 
-          category: 'chat_escalation' 
+          category: 'chat_escalation',
+          // Thêm dòng này để gửi kèm thông tin user
+          userName: user?.name || undefined,
+          userEmail: user?.email || undefined, 
         }),
       })
       setSupportSent(true)

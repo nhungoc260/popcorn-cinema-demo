@@ -277,12 +277,16 @@ export default function MovieDetailPage() {
                   </div>
                 ) : showtimes.length === 0 ? (
                   <div className="p-8 text-center rounded-2xl" style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
-                    <p style={{ color: 'var(--color-text-muted)' }}>Chưa có lịch chiếu</p>
+                    <p style={{ color: 'var(--color-text-muted)' }}>😔 Hiện chưa có lịch chiếu</p>
                   </div>
                 ) : (() => {
+                  const now = new Date()
+
                   // Lấy uniqueDates từ allShowtimeData (không bị filter theo date)
+                  // ✅ FIX: Chỉ tính ngày có suất chiếu trong tương lai
                   const allForDates = (allShowtimeData?.data?.data || showtimes).filter((s: any) =>
-                    !selectedTheaterId || s.theater?._id === selectedTheaterId
+                    (!selectedTheaterId || s.theater?._id === selectedTheaterId) &&
+                    new Date(s.startTime) >= now
                   )
                   const uniqueDates = [...new Set(allForDates.map((s: any) =>
                     new Date(s.startTime).toISOString().split('T')[0]
@@ -299,11 +303,21 @@ export default function MovieDetailPage() {
                   const firstAvailable = next7Days.find(d => uniqueDates.includes(d)) || today
                   const activeDate = selectedDate || firstAvailable
 
-                  // Filter showtimes for selected date + room
+                  // ✅ FIX: Filter showtimes for selected date + room + chỉ lấy suất tương lai
                   const dayShowtimes = showtimes.filter((s: any) =>
                     new Date(s.startTime).toISOString().split('T')[0] === activeDate &&
-                    (!selectedRoomId || s.room?._id === selectedRoomId)
+                    (!selectedRoomId || s.room?._id === selectedRoomId) &&
+                    new Date(s.startTime) >= now
                   )
+
+                  // ✅ FIX: Nếu không còn suất nào trong tương lai (toàn bộ phim đã qua giờ)
+                  if (uniqueDates.length === 0) {
+                    return (
+                      <div className="p-8 text-center rounded-2xl" style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+                        <p style={{ color: 'var(--color-text-muted)' }}>😔 Hiện chưa có lịch chiếu</p>
+                      </div>
+                    )
+                  }
 
                   const dayLabel = (d: string) => {
                     const date = new Date(d)
@@ -347,7 +361,9 @@ export default function MovieDetailPage() {
 
                       {/* Time buttons for selected day */}
                       {dayShowtimes.length === 0 ? (
-                        <p className="text-sm py-4" style={{ color: 'var(--color-text-muted)' }}>Không có suất chiếu ngày này</p>
+                        <div className="p-6 text-center rounded-2xl" style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+                          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>😔 Không có suất chiếu ngày này</p>
+                        </div>
                       ) : (
                         <div className="space-y-3">
                           {/* Group by room — deduplicate giờ trùng, giữ suất nhiều ghế nhất */}
@@ -358,8 +374,9 @@ export default function MovieDetailPage() {
                               if (!groups[key]) groups[key] = []
                               groups[key].push(st)
                             })
-                            return Object.entries(groups).map(([key, times]) => {
-                              // Deduplicate: cùng giờ → giữ suất có nhiều ghế trống nhất
+
+                            // ✅ FIX: Lọc ra các group thực sự có suất tương lai trước khi render
+                            const validEntries = Object.entries(groups).map(([key, times]) => {
                               const deduped = Object.values(
                                 times.reduce((acc: Record<string, any>, st: any) => {
                                   const timeKey = new Date(st.startTime).toISOString().slice(0, 16)
@@ -369,52 +386,67 @@ export default function MovieDetailPage() {
                                   }
                                   return acc
                                 }, {})
+                              ) as any[]
+
+                              // ✅ FIX: Chỉ giữ suất tương lai, bỏ qua group toàn suất đã qua
+                              const futureDeduped = deduped.filter((st: any) => new Date(st.startTime) >= now)
+                              if (futureDeduped.length === 0) return null
+
+                              return { key, times, futureDeduped }
+                            }).filter(Boolean) as { key: string; times: any[]; futureDeduped: any[] }[]
+
+                            if (validEntries.length === 0) {
+                              return (
+                                <div className="p-6 text-center rounded-2xl" style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+                                  <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>😔 Không có suất chiếu ngày này</p>
+                                </div>
                               )
+                            }
+
+                            return validEntries.map(({ key, times, futureDeduped }) => {
                               const roomName = times[0]?.room?.name || 'Phòng'
                               const theaterName = times[0]?.theater?.name
                               const label = theaters.length > 1 && !selectedTheaterId
                                 ? `${theaterName ? theaterName + ' · ' : ''}${roomName}`
                                 : roomName
                               return (
-                              <div key={key} className="p-4 rounded-2xl"
-                                style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
-                                <div className="text-xs font-semibold mb-3 flex items-center gap-2"
-                                  style={{ color: 'var(--color-text-muted)' }}>
-                                  🏛 {label}
+                                <div key={key} className="p-4 rounded-2xl"
+                                  style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+                                  <div className="text-xs font-semibold mb-3 flex items-center gap-2"
+                                    style={{ color: 'var(--color-text-muted)' }}>
+                                    🏛 {label}
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {futureDeduped.sort((a: any, b: any) =>
+                                      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+                                    ).map((st: any) => {
+                                      const available = (st.room?.totalSeats || 50) - (st.bookedSeats?.length ?? 0)
+                                      return (
+                                        <motion.button key={st._id}
+                                          whileHover={{ scale: available <= 0 ? 1 : 1.06 }}
+                                          whileTap={{ scale: available <= 0 ? 1 : 0.94 }}
+                                          disabled={available <= 0}
+                                          onClick={() => handleBooking(st._id)}
+                                          className="flex flex-col items-center px-4 py-2.5 rounded-xl font-bold transition-all"
+                                          style={{
+                                            border: `1.5px solid ${available <= 0 ? 'rgba(255,255,255,0.08)' : 'var(--color-primary)'}`,
+                                            color: available <= 0 ? 'var(--color-text-dim)' : 'var(--color-primary)',
+                                            background: available <= 0 ? 'transparent' : 'rgba(168,85,247,0.06)',
+                                            cursor: available <= 0 ? 'not-allowed' : 'pointer',
+                                            minWidth: 72,
+                                          }}>
+                                          <span className="text-sm">{formatTime(st.startTime)}</span>
+                                          <span className="text-xs mt-0.5" style={{
+                                            color: available <= 0 ? '#F87171' : available <= 10 ? '#F97316' : 'rgba(168,85,247,0.55)',
+                                            fontSize: 10
+                                          }}>
+                                            {available <= 0 ? 'Hết ghế' : `${available} ghế`}
+                                          </span>
+                                        </motion.button>
+                                      )
+                                    })}
+                                  </div>
                                 </div>
-                                <div className="flex flex-wrap gap-2">
-                                  {(deduped as any[]).sort((a: any, b: any) =>
-                                    new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-                                  ).map((st: any) => {
-                                    const isPast = new Date(st.startTime) < new Date()
-                                    const available = (st.room?.totalSeats || 50) - (st.bookedSeats?.length ?? 0)
-                                    if (isPast) return null
-                                    return (
-                                      <motion.button key={st._id}
-                                        whileHover={{ scale: available <= 0 ? 1 : 1.06 }}
-                                        whileTap={{ scale: available <= 0 ? 1 : 0.94 }}
-                                        disabled={available <= 0}
-                                        onClick={() => handleBooking(st._id)}
-                                        className="flex flex-col items-center px-4 py-2.5 rounded-xl font-bold transition-all"
-                                        style={{
-                                          border: `1.5px solid ${available <= 0 ? 'rgba(255,255,255,0.08)' : 'var(--color-primary)'}`,
-                                          color: available <= 0 ? 'var(--color-text-dim)' : 'var(--color-primary)',
-                                          background: available <= 0 ? 'transparent' : 'rgba(168,85,247,0.06)',
-                                          cursor: available <= 0 ? 'not-allowed' : 'pointer',
-                                          minWidth: 72,
-                                        }}>
-                                        <span className="text-sm">{formatTime(st.startTime)}</span>
-                                        <span className="text-xs mt-0.5" style={{
-                                          color: available <= 0 ? '#F87171' : available <= 10 ? '#F97316' : 'rgba(168,85,247,0.55)',
-                                          fontSize: 10
-                                        }}>
-                                          {available <= 0 ? 'Hết ghế' : `${available} ghế`}
-                                        </span>
-                                      </motion.button>
-                                    )
-                                  })}
-                                </div>
-                              </div>
                               )
                             })
                           })()}

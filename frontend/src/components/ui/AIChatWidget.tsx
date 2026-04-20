@@ -304,10 +304,32 @@ export default function AIChatWidget() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
 
+  // ✅ FIX: Chỉ giữ phim có suất chiếu thực tế trong tương lai
   useEffect(() => {
-    movieApi.getAll({ limit: 50 }).then(res => {
+    movieApi.getAll({ limit: 50 }).then(async res => {
       const all = res.data.data?.movies || res.data.data || []
-      setMovies(all.filter((m: any) => m.status === 'now_showing'))
+      const nowShowing = all.filter((m: any) => m.status === 'now_showing')
+      const now = new Date()
+
+      const results = await Promise.allSettled(
+        nowShowing.map(async (m: any) => {
+          try {
+            const r = await fetch(`/api/v1/showtimes?movieId=${m._id}`)
+            const data = await r.json()
+            const list: any[] = data.data?.showtimes || data.data || []
+            const hasUpcoming = list.some((s: any) => new Date(s.startTime) >= now)
+            return hasUpcoming ? m : null
+          } catch {
+            return null
+          }
+        })
+      )
+
+      const moviesWithShowtimes = results
+        .filter(r => r.status === 'fulfilled' && r.value !== null)
+        .map(r => (r as PromiseFulfilledResult<any>).value)
+
+      setMovies(moviesWithShowtimes)
     }).catch(() => {})
   }, [])
 

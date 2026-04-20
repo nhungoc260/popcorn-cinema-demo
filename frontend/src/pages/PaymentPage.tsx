@@ -337,7 +337,7 @@ export default function PaymentPage() {
                     </div>
                     <p className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>Quét bằng app ngân hàng bất kỳ</p>
                     <div className="p-2 rounded-xl inline-block text-xs" style={{ background: 'rgba(168,85,247,0.08)', color: 'var(--color-primary)' }}>
-                      Vietcombank · NGUYEN TRAN NHU NGOC · 1036219239
+                      Vietcombank · POPCORN CINEMA · 1036219239
                     </div>
                   </div>
                 ) : method === 'bank' ? (
@@ -349,7 +349,7 @@ export default function PaymentPage() {
                     <div className="p-3 rounded-2xl text-sm text-left mx-auto"
                       style={{ maxWidth: 320, background: 'rgba(253,230,138,0.06)', border: '1px solid rgba(253,230,138,0.25)', lineHeight: 2.2 }}>
                       <div>🏦 <span style={{ color: 'var(--color-text-muted)' }}>Ngân hàng:</span> <b style={{ color: '#FDE68A' }}>Vietcombank</b></div>
-                      <div>👤 <span style={{ color: 'var(--color-text-muted)' }}>Chủ TK:</span> <b style={{ color: '#FDE68A' }}>NGUYEN TRAN NHU NGOC</b></div>
+                      <div>👤 <span style={{ color: 'var(--color-text-muted)' }}>Chủ TK:</span> <b style={{ color: '#FDE68A' }}>POPCORN CINEMA</b></div>
                       <div>🔢 <span style={{ color: 'var(--color-text-muted)' }}>Số TK:</span> <b style={{ color: '#FDE68A', fontFamily: 'monospace', fontSize: 16 }}>1036219239</b></div>
                       <div>💬 <span style={{ color: 'var(--color-text-muted)' }}>Nội dung:</span> <b className="font-mono" style={{ color: 'var(--color-primary)' }}>{txnId}</b></div>
                       {booking && <div>💰 <span style={{ color: 'var(--color-text-muted)' }}>Số tiền:</span> <b style={{ color: 'var(--color-primary)' }}>{fmtPrice(finalAmount ?? booking.totalAmount)}</b></div>}
@@ -363,7 +363,7 @@ export default function PaymentPage() {
                     </div>
                     <p className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>Quét mã bằng app MoMo → Chuyển tiền → Bấm <b>"Đã Thanh Toán"</b></p>
                     <div className="p-2 rounded-xl inline-block text-xs" style={{ background: 'rgba(174,32,112,0.1)', color: '#AE2070' }}>
-                      MoMo · NGUYỄN TRẦN NHƯ NGỌC · *******681
+                      MoMo · POPCORN CINEMA · *******681
                     </div>
                     {booking && (
                       <div className="mt-2 p-2 rounded-xl text-xs" style={{ background: 'rgba(174,32,112,0.06)', color: 'var(--color-text-muted)' }}>

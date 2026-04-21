@@ -875,7 +875,7 @@ export default function StaffCounter() {
                     {couponData && (
                       <div className="mt-2 p-2 rounded-xl flex justify-between text-xs"
                         style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)' }}>
-                        <span style={{ color: '#34D399' }}>✅ Giảm {fmtPrice(couponData.discount)}</span>
+                        <span style={{ color: '#34D399' }}>✅ Giảm {fmtPrice(couponData.discountAmount)}</span>
                         <button onClick={() => { setCouponData(null); setCouponCode('') }}
                           style={{ color: '#F87171' }}>✕ Bỏ</button>
                       </div>

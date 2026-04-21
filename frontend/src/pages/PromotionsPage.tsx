@@ -252,8 +252,7 @@ export default function PromotionsPage() {
               </div>
               <div className="p-4" style={{ background: `${p.color || '#A855F7'}12` }}>
                 <h3 className="font-bold text-base mb-1.5" style={{ color: 'var(--color-text)' }}>{p.title}</h3>
-                <p className="text-sm leading-relaxed mb-3" style={{ color: 'var(--color-text-muted)' }}>{p.description}</p>
-                <div className="flex items-center gap-1.5 pt-2" style={{ borderTop: `1px solid ${p.color || '#A855F7'}30` }}>
+                <p className="text-sm leading-relaxed mb-3" style={{ color: 'var(--color-text-muted)', whiteSpace: 'pre-wrap' }}>{p.description}</p>                <div className="flex items-center gap-1.5 pt-2" style={{ borderTop: `1px solid ${p.color || '#A855F7'}30` }}>
                   <Clock className="w-3.5 h-3.5 flex-shrink-0" style={{ color: p.color || 'var(--color-primary)' }} />
                   <span className="text-xs" style={{ color: p.color || 'var(--color-primary)' }}>{p.validFrom || 'Áp dụng ngay'}</span>
                 </div>
@@ -305,8 +304,7 @@ export default function PromotionsPage() {
                 )}
               </div>
               <div className="p-5">
-                <p className="text-sm leading-relaxed mb-5" style={{ color: 'var(--color-text-muted)' }}>{selectedPromo.description}</p>
-                <div className="flex items-center gap-3 mb-4 p-3 rounded-xl" style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}>
+                  <p className="text-sm leading-relaxed mb-5" style={{ color: 'var(--color-text-muted)', whiteSpace: 'pre-wrap' }}>{selectedPromo.description}</p>                <div className="flex items-center gap-3 mb-4 p-3 rounded-xl" style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}>
                   <Calendar className="w-4 h-4 flex-shrink-0" style={{ color: selectedPromo.color || 'var(--color-primary)' }} />
                   <div>
                     <div className="text-xs font-semibold mb-0.5" style={{ color: 'var(--color-text)' }}>Thời gian áp dụng</div>

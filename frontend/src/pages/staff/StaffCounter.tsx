@@ -25,6 +25,7 @@ const TABS = [
   { id: 'revenue',  label: '📊 Doanh Thu',          activeColor: '#34D399' },
   { id: 'invoices', label: '🧾 Hóa Đơn',            activeColor: '#60a5fa' },
   { id: 'support', label: '🆘 Hỗ Trợ',             activeColor: '#34D399' },
+  { id: 'promotions', label: '🎁 Khuyến Mãi', activeColor: '#A855F7' },
 ]
 
 // 7 ngày để chọn suất chiếu (dùng local date tránh lệch timezone UTC vs VN)
@@ -40,8 +41,8 @@ const DATES = Array.from({ length: 7 }, (_, i) => {
 export default function StaffCounter() {
   const qc = useQueryClient()
   const { user } = useAuthStore()
-  const [tab, setTab] = useState<'sell' | 'confirm' | 'revenue' | 'invoices' | 'support'>('sell')
-
+  const [tab, setTab] = useState<'sell' | 'confirm' | 'revenue' | 'invoices' | 'support' | 'promotions'>('sell')
+  
   // ── SELL STATE ──
   const [selDate, setSelDate]         = useState(DATES[0].value)
   const [filterTheater, setFilterTheater] = useState<string>('')
@@ -1246,6 +1247,7 @@ export default function StaffCounter() {
         <InvoicesTab />
       )}
       {tab === 'support' && <SupportTab />}
+      {tab === 'promotions' && <StaffPromotionsTab />}
       {/* ── Modal QR sau khi xác nhận CK ── */}
       {confirmedPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -1612,6 +1614,199 @@ function InvoicesTab() {
     </motion.div>
   )
 }
+function StaffPromotionsTab() {
+  const [selectedPromo, setSelectedPromo] = useState<any | null>(null)
+  const [checkedTarget, setCheckedTarget] = useState('')
+  const [checkResult, setCheckResult] = useState<null | boolean>(null)
+
+  const { data: promotionsData } = useQuery({
+    queryKey: ['promotions-public'],
+    queryFn: () => api.get('/promotions'),
+    select: d => d.data.data,
+  })
+  const promotions: any[] = promotionsData || []
+
+  const isValid = (p: any) => {
+    if (!p.validTo) return true
+    const parts = p.validTo.split('/')
+    if (parts.length === 3) {
+      const end = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
+      if (end < new Date()) return false
+    }
+    return true
+  }
+
+  const checkEligibility = (promo: any) => {
+    if (!checkedTarget.trim()) return
+    const target = (promo.target || '').toLowerCase()
+    const input = checkedTarget.toLowerCase()
+    const keywords = target.split(/[,\s]+/).filter(Boolean)
+    setCheckResult(keywords.some(k => input.includes(k) || k.includes(input)))
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+      <div className="p-3 rounded-xl text-xs" style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)', color: 'var(--color-text-muted)' }}>
+        💡 Nhấn vào ưu đãi để xem chi tiết, kiểm tra đối tượng khách & xem mã giảm giá áp dụng tại quầy.
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {promotions.map((p: any) => {
+          const valid = isValid(p)
+          return (
+            <motion.div key={p._id} whileHover={{ y: -3, scale: 1.01 }}
+              onClick={() => { setSelectedPromo(p); setCheckedTarget(''); setCheckResult(null) }}
+              className="rounded-2xl overflow-hidden cursor-pointer relative"
+              style={{ border: `1px solid ${valid ? (p.color || '#A855F7') + '40' : 'rgba(255,255,255,0.08)'}`, opacity: valid ? 1 : 0.5 }}>
+              {!valid && (
+                <div className="absolute top-2 right-2 z-10 text-xs px-2 py-0.5 rounded-full font-bold"
+                  style={{ background: 'rgba(248,113,113,0.2)', color: '#F87171' }}>Hết hạn</div>
+              )}
+              <div className="h-20 flex items-center justify-center relative"
+                style={{ background: p.imageUrl ? undefined : (p.gradient || 'linear-gradient(135deg,#4C1D95,#7C3AED)') }}>
+                {p.imageUrl
+                  ? <img src={p.imageUrl} alt={p.title} className="w-full h-full object-cover" />
+                  : <span className="text-4xl">{p.emoji || '🎁'}</span>}
+                <div className="absolute top-2 left-2">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.4)', color: 'white' }}>{p.tag}</span>
+                </div>
+              </div>
+              <div className="p-3" style={{ background: `${p.color || '#A855F7'}10` }}>
+                <div className="font-bold text-sm mb-1" style={{ color: 'var(--color-text)' }}>{p.title}</div>
+                <div className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                  Đối tượng: <span style={{ color: p.color || 'var(--color-primary)', fontWeight: 600 }}>{p.target}</span>
+                </div>
+                {p.couponCode && (
+                  <div className="px-2 py-1 rounded-lg inline-flex items-center gap-1 text-xs font-black font-mono"
+                    style={{ background: 'rgba(168,85,247,0.12)', color: 'var(--color-primary)', border: '1px dashed rgba(168,85,247,0.4)' }}>
+                    🎟 {p.couponCode}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )
+        })}
+        {promotions.length === 0 && (
+          <div className="col-span-2 text-center py-10 rounded-2xl"
+            style={{ background: 'var(--color-bg-2)', border: '1px dashed var(--color-glass-border)', color: 'var(--color-text-muted)' }}>
+            Chưa có ưu đãi nào
+          </div>
+        )}
+      </div>
+
+        {/* Modal chi tiết */}
+        <AnimatePresence>
+          {selectedPromo && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center px-4"
+              style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}
+              onClick={e => { if (e.target === e.currentTarget) setSelectedPromo(null) }}>
+              <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9 }}
+                className="w-full max-w-md rounded-3xl overflow-hidden"
+                style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)', maxHeight: '88vh', overflowY: 'auto' }}>
+                <div className="h-36 flex items-center justify-center relative"
+                  style={{ background: selectedPromo.imageUrl ? undefined : (selectedPromo.gradient || 'linear-gradient(135deg,#4C1D95,#7C3AED)') }}>
+                  {selectedPromo.imageUrl
+                    ? <img src={selectedPromo.imageUrl} alt={selectedPromo.title} className="w-full h-full object-cover" />
+                    : <div className="text-center"><div className="text-5xl mb-1">{selectedPromo.emoji || '🎁'}</div>
+                      <div className="text-white font-bold px-4">{selectedPromo.title}</div></div>}
+                  <button onClick={() => setSelectedPromo(null)}
+                    className="absolute top-3 right-3 p-2 rounded-full" style={{ background: 'rgba(0,0,0,0.4)', color: 'white' }}>✕</button>
+                  {selectedPromo.imageUrl && (
+                    <div className="absolute bottom-0 left-0 right-0 p-3" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.7),transparent)' }}>
+                      <div className="text-white font-bold">{selectedPromo.title}</div>
+                    </div>
+                  )}
+                </div>
+
+              <div className="p-4 space-y-3">
+                <p className="text-sm" style={{ color: 'var(--color-text-muted)', whiteSpace: 'pre-wrap' }}>{selectedPromo.description}</p>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2.5 rounded-xl" style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}>
+                    <div className="text-xs font-semibold mb-0.5" style={{ color: 'var(--color-text)' }}>📅 Thời hạn</div>
+                    <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      {selectedPromo.validFrom || 'Ngay bây giờ'} → {selectedPromo.validTo || 'Không giới hạn'}
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl" style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}>
+                    <div className="text-xs font-semibold mb-0.5" style={{ color: 'var(--color-text)' }}>👥 Đối tượng</div>
+                    <div className="text-xs font-bold" style={{ color: selectedPromo.color || 'var(--color-primary)' }}>{selectedPromo.target}</div>
+                  </div>
+                </div>
+
+                {selectedPromo.conditions?.filter(Boolean).length > 0 && (
+                  <div className="p-3 rounded-xl" style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}>
+                    <div className="font-semibold text-xs mb-2" style={{ color: 'var(--color-text)' }}>⚠️ Điều kiện</div>
+                    <ul className="space-y-1">
+                      {selectedPromo.conditions.filter(Boolean).map((c: string, i: number) => (
+                        <li key={i} className="flex gap-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                          <span className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 font-bold"
+                            style={{ background: `${selectedPromo.color || '#A855F7'}20`, color: selectedPromo.color || 'var(--color-primary)', fontSize: 10 }}>{i + 1}</span>
+                          {c}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Mã giảm giá - CHỈ nhân viên thấy */}
+                {selectedPromo.couponCode && (
+                  <div className="p-3 rounded-xl flex items-center justify-between"
+                    style={{ background: 'rgba(168,85,247,0.08)', border: '2px dashed rgba(168,85,247,0.4)' }}>
+                    <div>
+                      <div className="text-xs mb-0.5" style={{ color: 'var(--color-text-muted)' }}>🎟 Mã áp dụng tại quầy</div>
+                      <div className="font-black font-mono text-xl" style={{ color: 'var(--color-primary)' }}>{selectedPromo.couponCode}</div>
+                    </div>
+                    <button onClick={() => { navigator.clipboard.writeText(selectedPromo.couponCode); toast.success('Đã copy mã!') }}
+                      className="px-3 py-2 rounded-xl text-xs font-bold"
+                      style={{ background: 'rgba(168,85,247,0.15)', color: 'var(--color-primary)', border: '1px solid rgba(168,85,247,0.3)' }}>
+                      Copy
+                    </button>
+                  </div>
+                )}
+
+                {/* Kiểm tra đối tượng */}
+                <div className="p-3 rounded-xl space-y-2" style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                  <div className="text-xs font-semibold" style={{ color: '#34D399' }}>✅ Kiểm tra khách có đủ điều kiện</div>
+                  <div className="flex gap-2">
+                    <input value={checkedTarget}
+                      onChange={e => { setCheckedTarget(e.target.value); setCheckResult(null) }}
+                      placeholder="VD: học sinh, sinh viên, thành viên VIP..."
+                      className="flex-1 px-3 py-2 rounded-xl text-xs outline-none"
+                      style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text)' }} />
+                    <button onClick={() => checkEligibility(selectedPromo)}
+                      className="px-3 py-2 rounded-xl text-xs font-bold"
+                      style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399', border: '1px solid rgba(52,211,153,0.3)' }}>
+                      Kiểm tra
+                    </button>
+                  </div>
+                  {checkResult !== null && (
+                    <div className="px-3 py-2 rounded-lg text-xs font-bold text-center"
+                      style={{
+                        background: checkResult ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)',
+                        color: checkResult ? '#34D399' : '#F87171',
+                        border: `1px solid ${checkResult ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}`,
+                      }}>
+                      {checkResult ? '✅ Khách đủ điều kiện được giảm giá!' : '❌ Khách không thuộc đối tượng ưu đãi này'}
+                    </div>
+                  )}
+                </div>
+
+                <button onClick={() => setSelectedPromo(null)}
+                  className="w-full py-3 rounded-xl text-sm font-medium"
+                  style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text-muted)' }}>
+                  Đóng
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
 function SupportTab() {
   const qc = useQueryClient()
   const [note, setNote] = useState<Record<string, string>>({})

@@ -55,7 +55,7 @@ export default function PromotionsPage() {
 
   const { data: promotionsData } = useQuery({
     queryKey: ['promotions-public'],
-    queryFn: () => api.get('/promotions'), 
+    queryFn: () => api.get('/promotions'),
     select: d => d.data.data,
   })
   const promotions: any[] = promotionsData || []
@@ -106,7 +106,7 @@ export default function PromotionsPage() {
 
   return (
     <div className="min-h-screen pt-20 pb-16 px-4" style={{ background: 'var(--color-bg)' }}>
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
 
         <motion.button initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
           onClick={() => navigate(-1)}
@@ -115,7 +115,7 @@ export default function PromotionsPage() {
           <ArrowLeft className="w-4 h-4" /> Quay lại
         </motion.button>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-4"
             style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)', color: 'var(--color-primary)' }}>
             <Gift className="w-4 h-4" /> Ưu đãi & Khuyến mãi
@@ -124,9 +124,9 @@ export default function PromotionsPage() {
           <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Hàng loạt ưu đãi dành riêng cho khách hàng Popcorn Cinema</p>
         </motion.div>
 
-        {/* Coupon section - admin only */}
+        {/* ===== COUPON SECTION (admin only) ===== */}
         {isAdmin && (
-          <div className="mb-10">
+          <div className="mb-12">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-lg flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
                 <Tag className="w-5 h-5" style={{ color: 'var(--color-primary)' }} /> Mã Giảm Giá
@@ -198,10 +198,10 @@ export default function PromotionsPage() {
           </div>
         )}
 
-        {/* Ưu đãi thường xuyên */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-lg flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
-            <Gift className="w-5 h-5" style={{ color: '#FDE68A' }} /> Ưu Đãi Thường Xuyên
+        {/* ===== PROMOTIONS GRID - CGV STYLE ===== */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="font-bold text-xl flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
+            <Gift className="w-5 h-5" style={{ color: '#FDE68A' }} /> Tin Tức & Ưu Đãi
           </h2>
           {isAdmin && (
             <button onClick={openNewPromo}
@@ -211,56 +211,91 @@ export default function PromotionsPage() {
             </button>
           )}
         </div>
-        <p className="text-sm mb-5" style={{ color: 'var(--color-text-muted)' }}>Nhấn vào từng ưu đãi để xem điều kiện chi tiết</p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {/* CGV-style grid: 4 columns on desktop */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {promotions.map((p: any, i: number) => (
-            <motion.div key={p._id || p.id}
-              initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
-              whileHover={{ y: -6, scale: 1.02 }}
+            <motion.div
+              key={p._id || p.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="group cursor-pointer"
               onClick={() => setSelectedPromo(p)}
-              className="rounded-2xl overflow-hidden cursor-pointer group relative"
-              style={{ border: `1px solid ${p.color || '#A855F7'}40` }}>
-              {isAdmin && (
-                <div className="absolute top-2 left-2 z-20 flex gap-1" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => openEditPromo(p)} className="p-1.5 rounded-lg" style={{ background: 'rgba(0,0,0,0.5)', color: 'white' }}>
-                    <Edit2 className="w-3 h-3" />
-                  </button>
-                  <button onClick={() => deletePromo(p._id)} className="p-1.5 rounded-lg" style={{ background: 'rgba(248,113,113,0.7)', color: 'white' }}>
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-              <div className="h-28 flex items-center justify-center relative overflow-hidden"
-                style={{ background: p.imageUrl ? undefined : (p.gradient || 'linear-gradient(135deg,#4C1D95,#7C3AED)') }}>
-                {p.imageUrl
-                  ? <img src={p.imageUrl} alt={p.title} className="w-full h-full object-cover" />
-                  : <span className="text-5xl drop-shadow-lg">
-                        {p.emoji || [...(p.title || '')][0] || '🎁'}
+            >
+              {/* Banner image area */}
+              <div className="relative rounded-xl overflow-hidden mb-3" style={{ aspectRatio: '3/4' }}>
+                {p.imageUrl ? (
+                  <img
+                    src={p.imageUrl}
+                    alt={p.title}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                ) : (
+                  <div
+                    className="w-full h-full flex flex-col items-center justify-center transition-transform duration-300 group-hover:scale-105"
+                    style={{ background: p.gradient || 'linear-gradient(135deg,#4C1D95,#7C3AED)' }}
+                  >
+                    <span className="text-5xl mb-3 drop-shadow-lg">
+                      {p.emoji || [...(p.title || '')][0] || '🎁'}
                     </span>
-                }
-                <div className="absolute top-2.5 right-2.5">
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(0,0,0,0.35)', color: 'white', backdropFilter: 'blur(4px)' }}>{p.tag}</span>
+                    <span className="text-white font-bold text-sm text-center px-4 leading-tight drop-shadow">
+                      {p.title}
+                    </span>
+                  </div>
+                )}
+
+                {/* Hover overlay */}
+                <div
+                  className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                  style={{ background: 'rgba(0,0,0,0.45)' }}
+                >
+                  <span className="text-white text-sm font-semibold px-3 py-1.5 rounded-full"
+                    style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(4px)' }}>
+                    Xem chi tiết →
+                  </span>
                 </div>
-                <div className="absolute bottom-2 left-3 flex items-center gap-1">
-                  <Calendar className="w-3 h-3" style={{ color: 'rgba(255,255,255,0.7)' }} />
-                  <span className="text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>HSD: {p.validTo || 'Không giới hạn'}</span>
+
+                {/* Tag badge */}
+                <div className="absolute top-2 right-2">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(0,0,0,0.55)', color: 'white', backdropFilter: 'blur(4px)' }}>
+                    {p.tag}
+                  </span>
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: 'rgba(0,0,0,0.4)' }}>
-                  <span className="text-white text-sm font-semibold">Xem điều kiện →</span>
-                </div>
+
+                {/* Admin controls */}
+                {isAdmin && (
+                  <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => openEditPromo(p)} className="p-1.5 rounded-lg" style={{ background: 'rgba(0,0,0,0.6)', color: 'white' }}>
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                    <button onClick={() => deletePromo(p._id)} className="p-1.5 rounded-lg" style={{ background: 'rgba(248,113,113,0.8)', color: 'white' }}>
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="p-4" style={{ background: `${p.color || '#A855F7'}12` }}>
-                <h3 className="font-bold text-base mb-1.5" style={{ color: 'var(--color-text)' }}>{p.title}</h3>
-                <p className="text-sm leading-relaxed mb-3" style={{ color: 'var(--color-text-muted)', whiteSpace: 'pre-wrap' }}>{p.description}</p>                <div className="flex items-center gap-1.5 pt-2" style={{ borderTop: `1px solid ${p.color || '#A855F7'}30` }}>
-                  <Clock className="w-3.5 h-3.5 flex-shrink-0" style={{ color: p.color || 'var(--color-primary)' }} />
-                  <span className="text-xs" style={{ color: p.color || 'var(--color-primary)' }}>{p.validFrom || 'Áp dụng ngay'}</span>
-                </div>
+
+              <div className="flex items-center gap-1.5 mb-1">
+                <Calendar className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-text-muted)' }} />
+                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                  {p.validFrom && p.validTo
+                    ? `${p.validFrom} - ${p.validTo}`
+                    : p.validFrom || p.validTo || 'Không giới hạn'}
+                </span>
               </div>
+
+              {/* Title */}
+              <h3 className="font-semibold text-sm leading-tight line-clamp-2 group-hover:underline"
+                style={{ color: 'var(--color-text)' }}>
+                {p.title}
+              </h3>
             </motion.div>
           ))}
+
           {promotions.length === 0 && (
-            <div className="col-span-3 text-center py-12 rounded-2xl"
+            <div className="col-span-4 text-center py-16 rounded-2xl"
               style={{ background: 'var(--color-bg-2)', border: '1px dashed var(--color-glass-border)', color: 'var(--color-text-muted)' }}>
               {isAdmin ? 'Chưa có ưu đãi nào. Bấm "Thêm ưu đãi" để tạo!' : 'Chưa có ưu đãi nào.'}
             </div>
@@ -276,55 +311,83 @@ export default function PromotionsPage() {
         </motion.div>
       </div>
 
-      {/* Popup chi tiết ưu đãi */}
+      {/* ===== POPUP CHI TIẾT ƯU ĐÃI ===== */}
       <AnimatePresence>
         {selectedPromo && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center px-4"
-            style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)' }}
+            style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}
             onClick={e => { if (e.target === e.currentTarget) setSelectedPromo(null) }}>
-            <motion.div initial={{ scale: 0.92, y: 24 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 24 }}
-              className="w-full max-w-lg rounded-3xl overflow-hidden"
-              style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)', maxHeight: '85vh', overflowY: 'auto' }}>
-              <div className="h-48 flex items-center justify-center relative"
+            <motion.div
+              initial={{ scale: 0.93, y: 24, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.93, y: 24, opacity: 0 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              className="w-full max-w-2xl rounded-3xl overflow-hidden flex flex-col md:flex-row"
+              style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)', maxHeight: '88vh' }}>
+
+              {/* Left: banner image */}
+              <div className="relative flex-shrink-0 md:w-56 h-48 md:h-auto"
                 style={{ background: selectedPromo.imageUrl ? undefined : (selectedPromo.gradient || 'linear-gradient(135deg,#4C1D95,#7C3AED)') }}>
                 {selectedPromo.imageUrl
                   ? <img src={selectedPromo.imageUrl} alt={selectedPromo.title} className="w-full h-full object-cover" />
-                  : <div className="text-center"><div className="text-6xl mb-2">{selectedPromo.emoji || '🎁'}</div>
-                    <h2 className="text-white font-bold text-lg px-6 drop-shadow">{selectedPromo.title}</h2></div>
+                  : <div className="w-full h-full flex flex-col items-center justify-center p-6">
+                      <div className="text-6xl mb-3">{selectedPromo.emoji || '🎁'}</div>
+                      <h2 className="text-white font-bold text-base text-center leading-tight drop-shadow">{selectedPromo.title}</h2>
+                    </div>
                 }
+                {/* Tag overlay */}
+                <div className="absolute top-3 left-3">
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full"
+                    style={{ background: 'rgba(0,0,0,0.5)', color: 'white', backdropFilter: 'blur(4px)' }}>
+                    {selectedPromo.tag}
+                  </span>
+                </div>
+              </div>
+
+              {/* Right: content */}
+              <div className="flex-1 overflow-y-auto p-5 relative">
                 <button onClick={() => setSelectedPromo(null)}
-                  className="absolute top-3 right-3 p-2 rounded-full" style={{ background: 'rgba(0,0,0,0.4)', color: 'white' }}>
+                  className="absolute top-4 right-4 p-2 rounded-full z-10 transition-colors"
+                  style={{ background: 'var(--color-bg-3)', color: 'var(--color-text-muted)' }}>
                   <X className="w-4 h-4" />
                 </button>
-                {selectedPromo.imageUrl && (
-                  <div className="absolute bottom-0 left-0 right-0 p-4" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)' }}>
-                    <h2 className="text-white font-bold text-lg">{selectedPromo.title}</h2>
-                  </div>
-                )}
-              </div>
-              <div className="p-5">
-                  <p className="text-sm leading-relaxed mb-5" style={{ color: 'var(--color-text-muted)', whiteSpace: 'pre-wrap' }}>{selectedPromo.description}</p>                <div className="flex items-center gap-3 mb-4 p-3 rounded-xl" style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}>
+
+                <h2 className="font-bold text-lg pr-10 mb-3 leading-tight" style={{ color: 'var(--color-text)' }}>
+                  {selectedPromo.title}
+                </h2>
+
+                {/* Date */}
+                <div className="flex items-center gap-2 mb-4 text-sm" style={{ color: 'var(--color-text-muted)' }}>
                   <Calendar className="w-4 h-4 flex-shrink-0" style={{ color: selectedPromo.color || 'var(--color-primary)' }} />
-                  <div>
-                    <div className="text-xs font-semibold mb-0.5" style={{ color: 'var(--color-text)' }}>Thời gian áp dụng</div>
-                    <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{selectedPromo.validFrom || 'Ngay bây giờ'} → {selectedPromo.validTo || 'Không giới hạn'}</div>
-                  </div>
+                  <span>
+                    {selectedPromo.validFrom && selectedPromo.validTo
+                      ? `${selectedPromo.validFrom} – ${selectedPromo.validTo}`
+                      : selectedPromo.validFrom || selectedPromo.validTo || 'Không giới hạn thời gian'}
+                  </span>
                 </div>
-                <div className="flex items-center gap-3 mb-5 p-3 rounded-xl" style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}>
+
+                {/* Description - full text */}
+                <p className="text-sm leading-relaxed mb-4"
+                  style={{ color: 'var(--color-text-muted)', whiteSpace: 'pre-wrap' }}>
+                  {selectedPromo.description}
+                </p>
+
+                {/* Target */}
+                <div className="flex items-center gap-2 mb-4 p-3 rounded-xl text-sm"
+                  style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}>
                   <Users className="w-4 h-4 flex-shrink-0" style={{ color: selectedPromo.color || 'var(--color-primary)' }} />
-                  <div>
-                    <div className="text-xs font-semibold mb-0.5" style={{ color: 'var(--color-text)' }}>Đối tượng áp dụng</div>
-                    <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{selectedPromo.target}</div>
-                  </div>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{selectedPromo.target}</span>
                 </div>
+
+                {/* Conditions */}
                 {selectedPromo.conditions?.filter(Boolean).length > 0 && (
-                  <div className="mb-5">
-                    <div className="flex items-center gap-2 mb-3">
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
                       <AlertCircle className="w-4 h-4" style={{ color: selectedPromo.color || 'var(--color-primary)' }} />
                       <span className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>Điều kiện áp dụng</span>
                     </div>
-                    <ul className="space-y-2">
+                    <ul className="space-y-1.5">
                       {selectedPromo.conditions.filter(Boolean).map((cond: string, i: number) => (
                         <li key={i} className="flex gap-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
                           <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5"
@@ -335,6 +398,8 @@ export default function PromotionsPage() {
                     </ul>
                   </div>
                 )}
+
+                {/* Coupon code */}
                 {selectedPromo.couponCode && (
                   <div className="mb-4 p-3 rounded-xl flex items-center justify-between"
                     style={{ background: 'rgba(168,85,247,0.08)', border: '2px dashed rgba(168,85,247,0.4)' }}>
@@ -352,12 +417,16 @@ export default function PromotionsPage() {
                     </button>
                   </div>
                 )}
-                <div className="flex gap-3">
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-2">
                   <button onClick={() => setSelectedPromo(null)}
-                    className="flex-1 py-3 rounded-xl text-sm font-medium"
-                    style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text-muted)' }}>Đóng</button>
+                    className="flex-1 py-2.5 rounded-xl text-sm font-medium"
+                    style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text-muted)' }}>
+                    Đóng
+                  </button>
                   <Link to="/movies" onClick={() => setSelectedPromo(null)}
-                    className="flex-1 py-3 rounded-xl text-sm font-bold text-center flex items-center justify-center gap-2"
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold text-center flex items-center justify-center gap-2"
                     style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))', color: 'white' }}>
                     <Ticket className="w-4 h-4" /> Đặt vé ngay
                   </Link>
@@ -368,7 +437,7 @@ export default function PromotionsPage() {
         )}
       </AnimatePresence>
 
-      {/* Form tạo/sửa ưu đãi */}
+      {/* ===== FORM TẠO/SỬA ƯU ĐÃI ===== */}
       <AnimatePresence>
         {showPromoForm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -388,15 +457,12 @@ export default function PromotionsPage() {
                 </div>
                 <div>
                   <label className="block text-xs mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Mô tả *</label>
-                  <textarea value={promoForm.description} onChange={setPField('description')} rows={2} placeholder="VD: Giảm 20%..." className={inputClass} style={inputStyle} />
+                  <textarea value={promoForm.description} onChange={setPField('description')} rows={3} placeholder="VD: Giảm 20%..." className={inputClass} style={inputStyle} />
                 </div>
                 <div>
-                <label className="block text-xs mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                  🎟 Mã coupon áp dụng (nếu có)
-                </label>
-                <input value={promoForm.couponCode} onChange={setPField('couponCode')}
-                  placeholder="VD: STUDENT20" className={inputClass} style={inputStyle} />
-              </div>
+                  <label className="block text-xs mb-1.5" style={{ color: 'var(--color-text-muted)' }}>🎟 Mã coupon áp dụng (nếu có)</label>
+                  <input value={promoForm.couponCode} onChange={setPField('couponCode')} placeholder="VD: STUDENT20" className={inputClass} style={inputStyle} />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Tag hiển thị</label>
@@ -475,7 +541,7 @@ export default function PromotionsPage() {
         )}
       </AnimatePresence>
 
-      {/* Form tạo coupon */}
+      {/* ===== FORM TẠO COUPON ===== */}
       <AnimatePresence>
         {showCouponForm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}

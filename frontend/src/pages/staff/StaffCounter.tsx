@@ -207,7 +207,7 @@ export default function StaffCounter() {
   const seats: any[] = localSeats
   const pending: any[] = pendingData || []
   const baseTotal = selSeats.reduce((s, seat) => s + (seat.price || 85000), 0)
-  const afterCoupon = couponData ? couponData.finalAmount : baseTotal
+  const afterCoupon = couponData ? Math.max(0, baseTotal - couponData.discountAmount) : baseTotal
   const total = Math.max(0, afterCoupon - pointsDiscount)
 
   // ── MUTATIONS ──
@@ -229,7 +229,7 @@ export default function StaffCounter() {
         isCounterSale: true,
       })
       const b = bookRes.data.data
-      const initRes = await paymentApi.initiate(b._id, payMethod)
+      const initRes = await paymentApi.initiate(b._id, payMethod, total, 0, couponCode || undefined)
       const txn = initRes.data.data.transactionId
       const qr  = initRes.data.data.qrData || null
       if (payMethod === 'cash') {
@@ -855,9 +855,12 @@ export default function StaffCounter() {
                           if (!couponCode) return
                           setCouponLoading(true)
                           try {
-                            const res = await api.post('/coupons/validate', { code: couponCode, amount: baseTotal })
+                            const res = await api.post('/coupons/apply', {
+                              code: couponCode,
+                              orderAmount: baseTotal,
+                            })
                             setCouponData(res.data.data)
-                            toast.success(`Giảm ${fmtPrice(res.data.data.discount)}!`)
+                            toast.success(`Giảm ${fmtPrice(res.data.data.discountAmount)}!`)
                           } catch (e: any) {
                             toast.error(e.response?.data?.message || 'Mã không hợp lệ')
                             setCouponData(null)

@@ -113,6 +113,8 @@ export interface IPayment extends Document {
     amount: number;
     originalAmount?: number;
     pointsUsed?: number;
+    couponCode?: string;
+    confirmedBy?: mongoose.Types.ObjectId;
     method: 'momo' | 'vietqr' | 'bank' | 'cash';
     status: 'pending' | 'pending_confirmation' | 'customer_confirmed' | 'success' | 'failed' | 'refunded';
     transactionId: string;

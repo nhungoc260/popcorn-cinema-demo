@@ -160,6 +160,8 @@ const PaymentSchema = new mongoose_1.Schema({
     amount: { type: Number, required: true },
     originalAmount: { type: Number, default: 0 },
     pointsUsed: { type: Number, default: 0 }, // giá gốc trước giảm giá
+    couponCode: { type: String, default: null }, // mã giảm giá áp dụng
+    confirmedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', default: null },
     method: { type: String, enum: ['momo', 'vietqr', 'bank', 'cash'], required: true },
     status: { type: String, enum: ['pending', 'pending_confirmation', 'customer_confirmed', 'success', 'failed', 'refunded'], default: 'pending' },
     transactionId: { type: String, unique: true },

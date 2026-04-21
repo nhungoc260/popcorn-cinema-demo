@@ -254,6 +254,8 @@ export interface IPayment extends Document {
   amount: number;
   originalAmount?: number;
   pointsUsed?: number;
+  couponCode?: string; 
+  confirmedBy?: mongoose.Types.ObjectId;
   method: 'momo' | 'vietqr' | 'bank' | 'cash';
   status: 'pending' | 'pending_confirmation' | 'customer_confirmed' | 'success' | 'failed' | 'refunded';
   transactionId: string;
@@ -270,6 +272,8 @@ const PaymentSchema = new Schema<IPayment>({
   amount: { type: Number, required: true },
   originalAmount: { type: Number, default: 0 },
   pointsUsed: { type: Number, default: 0 }, // giá gốc trước giảm giá
+  couponCode:  { type: String, default: null }, // mã giảm giá áp dụng
+  confirmedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   method: { type: String, enum: ['momo', 'vietqr', 'bank', 'cash'], required: true },
   status: { type: String, enum: ['pending', 'pending_confirmation', 'customer_confirmed', 'success', 'failed', 'refunded'], default: 'pending' },
   transactionId: { type: String, unique: true },

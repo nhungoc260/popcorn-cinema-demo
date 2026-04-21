@@ -9,8 +9,8 @@ r.post('/validate', authenticate, validateCoupon);
 r.post('/apply', authenticate, applyCoupon);
 r.get('/loyalty', authenticate, getMyLoyalty);
 
-// ── Admin routes ──
-r.get('/', authenticate, authorize('admin'), getCoupons);
+// ── Admin + Staff routes ──
+r.get('/', authenticate, authorize('admin', 'staff'), getCoupons);
 r.post('/', authenticate, authorize('admin'), createCoupon);
 r.delete('/:id', authenticate, authorize('admin'), deleteCoupon);
 

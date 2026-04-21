@@ -8,8 +8,8 @@ const r = (0, express_1.Router)();
 r.post('/validate', errorHandler_1.authenticate, coupon_controller_1.validateCoupon);
 r.post('/apply', errorHandler_1.authenticate, coupon_controller_1.applyCoupon);
 r.get('/loyalty', errorHandler_1.authenticate, coupon_controller_1.getMyLoyalty);
-// ── Admin routes ──
-r.get('/', errorHandler_1.authenticate, (0, errorHandler_1.authorize)('admin'), coupon_controller_1.getCoupons);
+// ── Admin + Staff routes ──
+r.get('/', errorHandler_1.authenticate, (0, errorHandler_1.authorize)('admin', 'staff'), coupon_controller_1.getCoupons);
 r.post('/', errorHandler_1.authenticate, (0, errorHandler_1.authorize)('admin'), coupon_controller_1.createCoupon);
 r.delete('/:id', errorHandler_1.authenticate, (0, errorHandler_1.authorize)('admin'), coupon_controller_1.deleteCoupon);
 exports.default = r;

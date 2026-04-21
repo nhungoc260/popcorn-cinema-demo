@@ -550,7 +550,7 @@ export default function PromotionsPage() {
                       </div>
                       <div>
                         <label className="block text-xs mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Đối tượng</label>
-                        <input value={promoForm.target} onChange={setPField('target')} placeholder="VD: Thành viên CGV" className={inputClass} style={inputStyle} />
+                        <input value={promoForm.target} onChange={setPField('target')} placeholder="VD: Thành viên PopCorn" className={inputClass} style={inputStyle} />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -643,7 +643,7 @@ export default function PromotionsPage() {
                           <label className="block text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>📍 Địa điểm / Ghi chú</label>
                           <input value={s.location}
                             onChange={e => { const arr = [...promoForm.schedules]; arr[i] = { ...arr[i], location: e.target.value }; setPromoForm((f: any) => ({ ...f, schedules: arr })) }}
-                            placeholder="VD: TP.HCM: CGV Sư Vạn Hạnh" className={inputClass} style={inputStyle} />
+                            placeholder="VD: TP.HCM: PopCorn Quận 1" className={inputClass} style={inputStyle} />
                         </div>
                       </div>
                     ))}
@@ -681,7 +681,7 @@ export default function PromotionsPage() {
                           <div key={pi} className="flex gap-2">
                             <input value={p}
                               onChange={e => { const arr = [...promoForm.locationGroups]; arr[gi].places[pi] = e.target.value; setPromoForm((f: any) => ({ ...f, locationGroups: arr })) }}
-                              placeholder="VD: CGV Vincom Landmark 81" className={inputClass} style={inputStyle} />
+                              placeholder="VD: PopCorn Quận 1" className={inputClass} style={inputStyle} />
                             <button onClick={() => { const arr = [...promoForm.locationGroups]; arr[gi].places = arr[gi].places.filter((_: string, j: number) => j !== pi); if (!arr[gi].places.length) arr[gi].places = ['']; setPromoForm((f: any) => ({ ...f, locationGroups: arr })) }}
                               className="p-2 rounded-xl flex-shrink-0" style={{ background: 'rgba(248,113,113,0.1)', color: '#F87171' }}>
                               <X className="w-3.5 h-3.5" />
@@ -709,7 +709,7 @@ export default function PromotionsPage() {
                 {openSection === 'conditions' && (
                   <div className="space-y-2 pb-2">
                     <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      Mỗi dòng là 1 điều kiện, VD: "Áp dụng cho thành viên CGV mua vé trực tiếp"
+                      Mỗi dòng là 1 điều kiện, VD: "Áp dụng cho thành viên PopCorn mua vé trực tiếp"
                     </p>
                     {promoForm.conditions.map((cond: string, i: number) => (
                       <div key={i} className="flex gap-2">

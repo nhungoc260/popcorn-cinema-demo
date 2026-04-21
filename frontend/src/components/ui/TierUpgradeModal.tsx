@@ -14,7 +14,11 @@ const TIER_CONFIG = {
     glow: 'rgba(205,127,50,0.4)',
     gradient: 'linear-gradient(135deg,#CD7F32,#A0522D)',
     bg: 'rgba(205,127,50,0.08)',
-    perks: ['Tích điểm mỗi lần đặt vé', 'Ưu đãi sinh nhật'],
+    perks: [
+      'Tích điểm mỗi lần đặt vé',
+      'Nhận thông báo phim mới sớm',
+      'Giảm thêm 10% trong tháng sinh nhật',
+    ],
   },
   silver: {
     label: 'Bạc',
@@ -23,7 +27,12 @@ const TIER_CONFIG = {
     glow: 'rgba(192,192,192,0.4)',
     gradient: 'linear-gradient(135deg,#C0C0C0,#808080)',
     bg: 'rgba(192,192,192,0.08)',
-    perks: ['Giảm 5% mỗi vé', 'Ưu tiên chọn ghế', 'Ưu đãi sinh nhật'],
+    perks: [
+      'Giảm 5% mỗi vé',
+      'Ưu tiên chọn ghế đẹp',
+      'Huỷ vé miễn phí trước 2 giờ chiếu',
+      'Giảm thêm 15% trong tháng sinh nhật',
+    ],
   },
   gold: {
     label: 'Vàng',
@@ -32,7 +41,13 @@ const TIER_CONFIG = {
     glow: 'rgba(255,215,0,0.4)',
     gradient: 'linear-gradient(135deg,#FFD700,#FFA500)',
     bg: 'rgba(255,215,0,0.08)',
-    perks: ['Giảm 8% mỗi vé', 'Ưu tiên chọn ghế', '1 vé miễn phí/tháng', 'Ưu đãi sinh nhật'],
+    perks: [
+      'Giảm 8% mỗi vé',
+      'Ưu tiên chọn ghế đẹp',
+      'Huỷ vé miễn phí trước 4 giờ chiếu',
+      'Đặt vé sớm trước khi mở bán (Early Access)',
+      'Giảm thêm 20% trong tháng sinh nhật',
+    ],
   },
   platinum: {
     label: 'Kim Cương',
@@ -41,7 +56,14 @@ const TIER_CONFIG = {
     glow: 'rgba(168,85,247,0.5)',
     gradient: 'linear-gradient(135deg,#A855F7,#7C3AED)',
     bg: 'rgba(168,85,247,0.08)',
-    perks: ['Giảm 10% mỗi vé', 'Ghế VIP ưu tiên', '2 vé miễn phí/tháng', 'Phòng chờ VIP', 'Ưu đãi sinh nhật'],
+    perks: [
+      'Giảm 10% mỗi vé',
+      'Ghế VIP ưu tiên',
+      'Huỷ vé miễn phí trước 24 giờ chiếu',
+      'Early Access + đặt trước khi mở bán công khai',
+      'Hỗ trợ khách hàng ưu tiên 24/7',
+      'Giảm thêm 30% trong tháng sinh nhật',
+    ],
   },
 }
 

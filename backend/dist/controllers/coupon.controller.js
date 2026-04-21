@@ -33,6 +33,7 @@ async function validateCoupon(req, res) {
     }
 }
 // POST /coupons/apply
+// POST /coupons/apply
 async function applyCoupon(req, res) {
     try {
         const { code, orderAmount } = req.body;
@@ -47,6 +48,20 @@ async function applyCoupon(req, res) {
             return res.status(400).json({ success: false, message: 'Bạn đã sử dụng mã này rồi' });
         if (orderAmount < coupon.minOrder)
             return res.status(400).json({ success: false, message: `Đơn tối thiểu ${coupon.minOrder.toLocaleString('vi')}đ` });
+        if (coupon.eligibleTiers && coupon.eligibleTiers.length > 0) {
+            const loyalty = await models_1.Loyalty.findOne({ user: req.user.id });
+            const userTier = loyalty?.tier || 'bronze';
+            if (!coupon.eligibleTiers.includes(userTier)) {
+                const tierLabel = {
+                    bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch Kim'
+                };
+                const required = coupon.eligibleTiers.map(t => tierLabel[t]).join(', ');
+                return res.status(403).json({
+                    success: false,
+                    message: `Mã này chỉ dành cho thành viên hạng ${required}`
+                });
+            }
+        }
         const discountAmount = coupon.type === 'percent'
             ? Math.min(Math.round(orderAmount * coupon.value / 100), coupon.maxDiscount)
             : Math.min(coupon.value, coupon.maxDiscount);

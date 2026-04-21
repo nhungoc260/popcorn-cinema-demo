@@ -148,6 +148,7 @@ export interface ICoupon extends Document {
     expiresAt: Date;
     isActive: boolean;
     usedBy: mongoose.Types.ObjectId[];
+    eligibleTiers: ('bronze' | 'silver' | 'gold' | 'platinum')[];
 }
 export interface ILoyalty extends Document {
     user: mongoose.Types.ObjectId;

@@ -195,6 +195,7 @@ const CouponSchema = new mongoose_1.Schema({
     expiresAt: { type: Date, required: true },
     isActive: { type: Boolean, default: true },
     usedBy: [{ type: mongoose_1.Schema.Types.ObjectId, ref: 'User' }],
+    eligibleTiers: [{ type: String, enum: ['bronze', 'silver', 'gold', 'platinum'] }],
 }, { timestamps: true });
 const LoyaltySchema = new mongoose_1.Schema({
     user: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },

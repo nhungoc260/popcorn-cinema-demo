@@ -333,6 +333,7 @@ export interface ICoupon extends Document {
   expiresAt: Date;
   isActive: boolean;
   usedBy: mongoose.Types.ObjectId[];
+  eligibleTiers: ('bronze' | 'silver' | 'gold' | 'platinum')[];
 }
 const CouponSchema = new Schema<ICoupon>({
   code: { type: String, required: true, unique: true, uppercase: true },
@@ -345,6 +346,7 @@ const CouponSchema = new Schema<ICoupon>({
   expiresAt: { type: Date, required: true },
   isActive: { type: Boolean, default: true },
   usedBy: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  eligibleTiers: [{ type: String, enum: ['bronze', 'silver', 'gold', 'platinum'] }],
 }, { timestamps: true });
 
 // ════════════════════════════════════════════════════════

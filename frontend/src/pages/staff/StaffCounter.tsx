@@ -1247,7 +1247,15 @@ export default function StaffCounter() {
         <InvoicesTab />
       )}
       {tab === 'support' && <SupportTab />}
-      {tab === 'promotions' && <StaffPromotionsTab />}
+      {tab === 'promotions' && (
+        <StaffPromotionsTab
+          onUseCoupon={(code) => {
+            setCouponCode(code)
+            setTab('sell')
+            toast.success(`Đã chọn mã ${code} — vào bước Thanh Toán để áp dụng!`)
+          }}
+        />
+      )}
       {/* ── Modal QR sau khi xác nhận CK ── */}
       {confirmedPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -1614,10 +1622,12 @@ function InvoicesTab() {
     </motion.div>
   )
 }
-function StaffPromotionsTab() {
+function StaffPromotionsTab({ onUseCoupon }: { onUseCoupon?: (code: string) => void }) {
   const [selectedPromo, setSelectedPromo] = useState<any | null>(null)
   const [checkedTarget, setCheckedTarget] = useState('')
   const [checkResult, setCheckResult] = useState<null | boolean>(null)
+  const [couponSearch, setCouponSearch] = useState('')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const { data: promotionsData } = useQuery({
     queryKey: ['promotions-public'],
@@ -1625,6 +1635,46 @@ function StaffPromotionsTab() {
     select: d => d.data.data,
   })
   const promotions: any[] = promotionsData || []
+
+  // ── NEW: Fetch coupon list ──
+  const { data: couponsData, isLoading: loadingCoupons } = useQuery({
+    queryKey: ['staff-coupons'],
+    queryFn: () => api.get('/coupons'),
+    select: d => d.data.data as any[],
+  })
+  const allCoupons: any[] = couponsData || []
+
+  // Filter + sort: active trước, hết hạn sau
+  const filteredCoupons = allCoupons
+    .filter(c => {
+      const q = couponSearch.toLowerCase()
+      return !q || c.code?.toLowerCase().includes(q) || c.description?.toLowerCase().includes(q)
+    })
+    .sort((a, b) => {
+      const aExp = a.expiresAt ? new Date(a.expiresAt).getTime() : Infinity
+      const bExp = b.expiresAt ? new Date(b.expiresAt).getTime() : Infinity
+      const now = Date.now()
+      const aExpired = aExp < now
+      const bExpired = bExp < now
+      if (aExpired !== bExpired) return aExpired ? 1 : -1
+      return aExp - bExp
+    })
+
+  const fmtCouponDiscount = (c: any) => {
+    if (c.discountType === 'percent') return `-${c.discountValue}%`
+    if (c.discountType === 'fixed') return `-${c.discountValue?.toLocaleString('vi-VN')}đ`
+    return `${c.discountValue}`
+  }
+
+  const isCouponExpired = (c: any) => c.expiresAt && new Date(c.expiresAt).getTime() < Date.now()
+  const isCouponFull = (c: any) => c.maxUses > 0 && (c.usedCount || 0) >= c.maxUses
+
+  const handleCopy = (code: string, id: string) => {
+    navigator.clipboard.writeText(code)
+    setCopiedId(id)
+    toast.success('Đã copy mã!')
+    setTimeout(() => setCopiedId(null), 2000)
+  }
 
   const isValid = (p: any) => {
     if (!p.validTo) return true
@@ -1645,79 +1695,255 @@ function StaffPromotionsTab() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-      <div className="p-3 rounded-xl text-xs" style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)', color: 'var(--color-text-muted)' }}>
-        💡 Nhấn vào ưu đãi để xem chi tiết, kiểm tra đối tượng khách & xem mã giảm giá áp dụng tại quầy.
-      </div>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {promotions.map((p: any) => {
-          const valid = isValid(p)
-          return (
-            <motion.div key={p._id} whileHover={{ y: -3, scale: 1.01 }}
-              onClick={() => { setSelectedPromo(p); setCheckedTarget(''); setCheckResult(null) }}
-              className="rounded-2xl overflow-hidden cursor-pointer relative"
-              style={{ border: `1px solid ${valid ? (p.color || '#A855F7') + '40' : 'rgba(255,255,255,0.08)'}`, opacity: valid ? 1 : 0.5 }}>
-              {!valid && (
-                <div className="absolute top-2 right-2 z-10 text-xs px-2 py-0.5 rounded-full font-bold"
-                  style={{ background: 'rgba(248,113,113,0.2)', color: '#F87171' }}>Hết hạn</div>
-              )}
-              <div className="h-20 flex items-center justify-center relative"
-                style={{ background: p.imageUrl ? undefined : (p.gradient || 'linear-gradient(135deg,#4C1D95,#7C3AED)') }}>
-                {p.imageUrl
-                  ? <img src={p.imageUrl} alt={p.title} className="w-full h-full object-cover" />
-                  : <span className="text-4xl">{p.emoji || '🎁'}</span>}
-                <div className="absolute top-2 left-2">
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.4)', color: 'white' }}>{p.tag}</span>
-                </div>
-              </div>
-              <div className="p-3" style={{ background: `${p.color || '#A855F7'}10` }}>
-                <div className="font-bold text-sm mb-1" style={{ color: 'var(--color-text)' }}>{p.title}</div>
-                <div className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>
-                  Đối tượng: <span style={{ color: p.color || 'var(--color-primary)', fontWeight: 600 }}>{p.target}</span>
-                </div>
-                {p.couponCode && (
-                  <div className="px-2 py-1 rounded-lg inline-flex items-center gap-1 text-xs font-black font-mono"
-                    style={{ background: 'rgba(168,85,247,0.12)', color: 'var(--color-primary)', border: '1px dashed rgba(168,85,247,0.4)' }}>
-                    🎟 {p.couponCode}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )
-        })}
-        {promotions.length === 0 && (
-          <div className="col-span-2 text-center py-10 rounded-2xl"
+      {/* ── SECTION: MÃ GIẢM GIÁ (mới) ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🎟</span>
+            <span className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>Mã Giảm Giá</span>
+            {!loadingCoupons && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold"
+                style={{ background: 'rgba(168,85,247,0.12)', color: 'var(--color-primary)', border: '1px solid rgba(168,85,247,0.25)' }}>
+                {filteredCoupons.filter(c => !isCouponExpired(c) && !isCouponFull(c)).length} khả dụng
+              </span>
+            )}
+          </div>
+          {/* Search */}
+          <div className="relative">
+            <input
+              value={couponSearch}
+              onChange={e => setCouponSearch(e.target.value)}
+              placeholder="Tìm mã..."
+              className="pl-3 pr-3 py-1.5 rounded-xl text-xs outline-none w-36"
+              style={{
+                background: 'var(--color-bg-3)',
+                border: '1px solid var(--color-glass-border)',
+                color: 'var(--color-text)',
+              }}
+            />
+          </div>
+        </div>
+
+        {loadingCoupons ? (
+          <div className="grid grid-cols-2 gap-2">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="h-20 rounded-2xl skeleton" />
+            ))}
+          </div>
+        ) : filteredCoupons.length === 0 ? (
+          <div className="py-8 text-center rounded-2xl"
             style={{ background: 'var(--color-bg-2)', border: '1px dashed var(--color-glass-border)', color: 'var(--color-text-muted)' }}>
-            Chưa có ưu đãi nào
+            Không có mã giảm giá
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {filteredCoupons.map((c: any) => {
+              const expired = isCouponExpired(c)
+              const full = isCouponFull(c)
+              const disabled = expired || full
+              const usePct = c.maxUses > 0 ? Math.round(((c.usedCount || 0) / c.maxUses) * 100) : 0
+
+              return (
+                <motion.div
+                  key={c._id}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="relative rounded-2xl overflow-hidden"
+                  style={{
+                    background: disabled ? 'rgba(255,255,255,0.02)' : 'var(--color-bg-2)',
+                    border: `1px solid ${disabled ? 'rgba(255,255,255,0.06)' : 'rgba(168,85,247,0.3)'}`,
+                    opacity: disabled ? 0.55 : 1,
+                  }}
+                >
+                  {/* Dashed divider giữa (như vé) */}
+                  <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 border-t border-dashed"
+                    style={{ borderColor: disabled ? 'rgba(255,255,255,0.06)' : 'rgba(168,85,247,0.2)' }} />
+
+                  <div className="flex items-stretch">
+                    {/* Discount badge bên trái */}
+                    <div className="flex items-center justify-center px-3 py-3 flex-shrink-0"
+                      style={{
+                        background: disabled
+                          ? 'rgba(255,255,255,0.03)'
+                          : 'linear-gradient(135deg,rgba(168,85,247,0.15),rgba(168,85,247,0.05))',
+                        minWidth: 72,
+                        borderRight: `1px dashed ${disabled ? 'rgba(255,255,255,0.06)' : 'rgba(168,85,247,0.25)'}`,
+                      }}>
+                      <span className="font-black text-lg leading-none text-center"
+                        style={{ color: disabled ? 'var(--color-text-dim)' : 'var(--color-primary)' }}>
+                        {fmtCouponDiscount(c)}
+                      </span>
+                    </div>
+
+                    {/* Info bên phải */}
+                    <div className="flex-1 px-3 py-2.5 min-w-0">
+                      {/* Code + status */}
+                      <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                        <span className="font-black font-mono text-sm tracking-wider"
+                          style={{ color: disabled ? 'var(--color-text-dim)' : 'var(--color-text)' }}>
+                          {c.code}
+                        </span>
+                        {expired && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full font-bold"
+                            style={{ background: 'rgba(248,113,113,0.12)', color: '#F87171' }}>Hết hạn</span>
+                        )}
+                        {full && !expired && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full font-bold"
+                            style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24' }}>Hết lượt</span>
+                        )}
+                      </div>
+
+                      {/* Min order */}
+                      {c.minOrderAmount > 0 && (
+                        <div className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                          Đơn tối thiểu {c.minOrderAmount?.toLocaleString('vi-VN')}đ
+                        </div>
+                      )}
+
+                      {/* Expiry */}
+                      {c.expiresAt && (
+                        <div className="text-xs mb-1.5" style={{ color: expired ? '#F87171' : 'var(--color-text-dim)' }}>
+                          HSD: {new Date(c.expiresAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </div>
+                      )}
+
+                      {/* Usage bar */}
+                      {c.maxUses > 0 && (
+                        <div className="mb-2">
+                          <div className="flex justify-between text-xs mb-0.5" style={{ color: 'var(--color-text-dim)' }}>
+                            <span>{c.usedCount || 0}/{c.maxUses} lượt</span>
+                            <span>{usePct}%</span>
+                          </div>
+                          <div className="h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                            <div className="h-full rounded-full transition-all"
+                              style={{
+                                width: `${usePct}%`,
+                                background: usePct >= 90 ? '#F87171' : usePct >= 70 ? '#fbbf24' : 'var(--color-primary)',
+                              }} />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      {!disabled && (
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => handleCopy(c.code, c._id)}
+                            className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                            style={{
+                              background: copiedId === c._id ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.05)',
+                              color: copiedId === c._id ? '#34D399' : 'var(--color-text-muted)',
+                              border: `1px solid ${copiedId === c._id ? 'rgba(52,211,153,0.3)' : 'var(--color-glass-border)'}`,
+                            }}>
+                            {copiedId === c._id ? '✓ Đã copy' : '📋 Copy'}
+                          </button>
+                          {onUseCoupon && (
+                            <button
+                              onClick={() => onUseCoupon(c.code)}
+                              className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
+                              style={{
+                                background: 'linear-gradient(135deg,var(--color-primary),var(--color-primary-dark))',
+                                color: 'white',
+                              }}>
+                              Dùng ngay →
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
           </div>
         )}
       </div>
 
-        {/* Modal chi tiết */}
-        <AnimatePresence>
-          {selectedPromo && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center px-4"
-              style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}
-              onClick={e => { if (e.target === e.currentTarget) setSelectedPromo(null) }}>
-              <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9 }}
-                className="w-full max-w-md rounded-3xl overflow-hidden"
-                style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)', maxHeight: '88vh', overflowY: 'auto' }}>
-                <div className="h-36 flex items-center justify-center relative"
-                  style={{ background: selectedPromo.imageUrl ? undefined : (selectedPromo.gradient || 'linear-gradient(135deg,#4C1D95,#7C3AED)') }}>
-                  {selectedPromo.imageUrl
-                    ? <img src={selectedPromo.imageUrl} alt={selectedPromo.title} className="w-full h-full object-cover" />
-                    : <div className="text-center"><div className="text-5xl mb-1">{selectedPromo.emoji || '🎁'}</div>
-                      <div className="text-white font-bold px-4">{selectedPromo.title}</div></div>}
-                  <button onClick={() => setSelectedPromo(null)}
-                    className="absolute top-3 right-3 p-2 rounded-full" style={{ background: 'rgba(0,0,0,0.4)', color: 'white' }}>✕</button>
-                  {selectedPromo.imageUrl && (
-                    <div className="absolute bottom-0 left-0 right-0 p-3" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.7),transparent)' }}>
-                      <div className="text-white font-bold">{selectedPromo.title}</div>
+      {/* Divider */}
+      <div className="border-t" style={{ borderColor: 'var(--color-glass-border)' }} />
+
+      {/* ── SECTION: ƯU ĐÃI & CHƯƠNG TRÌNH (giữ nguyên) ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-base">🎁</span>
+          <span className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>Chương Trình Ưu Đãi</span>
+        </div>
+
+        <div className="p-3 rounded-xl text-xs mb-4" style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)', color: 'var(--color-text-muted)' }}>
+          💡 Nhấn vào ưu đãi để xem chi tiết, kiểm tra đối tượng khách & xem mã giảm giá áp dụng tại quầy.
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {promotions.map((p: any) => {
+            const valid = isValid(p)
+            return (
+              <motion.div key={p._id} whileHover={{ y: -3, scale: 1.01 }}
+                onClick={() => { setSelectedPromo(p); setCheckedTarget(''); setCheckResult(null) }}
+                className="rounded-2xl overflow-hidden cursor-pointer relative"
+                style={{ border: `1px solid ${valid ? (p.color || '#A855F7') + '40' : 'rgba(255,255,255,0.08)'}`, opacity: valid ? 1 : 0.5 }}>
+                {!valid && (
+                  <div className="absolute top-2 right-2 z-10 text-xs px-2 py-0.5 rounded-full font-bold"
+                    style={{ background: 'rgba(248,113,113,0.2)', color: '#F87171' }}>Hết hạn</div>
+                )}
+                <div className="h-20 flex items-center justify-center relative"
+                  style={{ background: p.imageUrl ? undefined : (p.gradient || 'linear-gradient(135deg,#4C1D95,#7C3AED)') }}>
+                  {p.imageUrl
+                    ? <img src={p.imageUrl} alt={p.title} className="w-full h-full object-cover" />
+                    : <span className="text-4xl">{p.emoji || '🎁'}</span>}
+                  <div className="absolute top-2 left-2">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.4)', color: 'white' }}>{p.tag}</span>
+                  </div>
+                </div>
+                <div className="p-3" style={{ background: `${p.color || '#A855F7'}10` }}>
+                  <div className="font-bold text-sm mb-1" style={{ color: 'var(--color-text)' }}>{p.title}</div>
+                  <div className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                    Đối tượng: <span style={{ color: p.color || 'var(--color-primary)', fontWeight: 600 }}>{p.target}</span>
+                  </div>
+                  {p.couponCode && (
+                    <div className="px-2 py-1 rounded-lg inline-flex items-center gap-1 text-xs font-black font-mono"
+                      style={{ background: 'rgba(168,85,247,0.12)', color: 'var(--color-primary)', border: '1px dashed rgba(168,85,247,0.4)' }}>
+                      🎟 {p.couponCode}
                     </div>
                   )}
                 </div>
+              </motion.div>
+            )
+          })}
+          {promotions.length === 0 && (
+            <div className="col-span-2 text-center py-10 rounded-2xl"
+              style={{ background: 'var(--color-bg-2)', border: '1px dashed var(--color-glass-border)', color: 'var(--color-text-muted)' }}>
+              Chưa có ưu đãi nào
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal chi tiết promotion (giữ nguyên) */}
+      <AnimatePresence>
+        {selectedPromo && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center px-4"
+            style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}
+            onClick={e => { if (e.target === e.currentTarget) setSelectedPromo(null) }}>
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9 }}
+              className="w-full max-w-md rounded-3xl overflow-hidden"
+              style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)', maxHeight: '88vh', overflowY: 'auto' }}>
+              <div className="h-36 flex items-center justify-center relative"
+                style={{ background: selectedPromo.imageUrl ? undefined : (selectedPromo.gradient || 'linear-gradient(135deg,#4C1D95,#7C3AED)') }}>
+                {selectedPromo.imageUrl
+                  ? <img src={selectedPromo.imageUrl} alt={selectedPromo.title} className="w-full h-full object-cover" />
+                  : <div className="text-center"><div className="text-5xl mb-1">{selectedPromo.emoji || '🎁'}</div>
+                    <div className="text-white font-bold px-4">{selectedPromo.title}</div></div>}
+                <button onClick={() => setSelectedPromo(null)}
+                  className="absolute top-3 right-3 p-2 rounded-full" style={{ background: 'rgba(0,0,0,0.4)', color: 'white' }}>✕</button>
+                {selectedPromo.imageUrl && (
+                  <div className="absolute bottom-0 left-0 right-0 p-3" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.7),transparent)' }}>
+                    <div className="text-white font-bold">{selectedPromo.title}</div>
+                  </div>
+                )}
+              </div>
 
               <div className="p-4 space-y-3">
                 <p className="text-sm" style={{ color: 'var(--color-text-muted)', whiteSpace: 'pre-wrap' }}>{selectedPromo.description}</p>
@@ -1750,7 +1976,6 @@ function StaffPromotionsTab() {
                   </div>
                 )}
 
-                {/* Mã giảm giá - CHỈ nhân viên thấy */}
                 {selectedPromo.couponCode && (
                   <div className="p-3 rounded-xl flex items-center justify-between"
                     style={{ background: 'rgba(168,85,247,0.08)', border: '2px dashed rgba(168,85,247,0.4)' }}>
@@ -1758,15 +1983,23 @@ function StaffPromotionsTab() {
                       <div className="text-xs mb-0.5" style={{ color: 'var(--color-text-muted)' }}>🎟 Mã áp dụng tại quầy</div>
                       <div className="font-black font-mono text-xl" style={{ color: 'var(--color-primary)' }}>{selectedPromo.couponCode}</div>
                     </div>
-                    <button onClick={() => { navigator.clipboard.writeText(selectedPromo.couponCode); toast.success('Đã copy mã!') }}
-                      className="px-3 py-2 rounded-xl text-xs font-bold"
-                      style={{ background: 'rgba(168,85,247,0.15)', color: 'var(--color-primary)', border: '1px solid rgba(168,85,247,0.3)' }}>
-                      Copy
-                    </button>
+                    <div className="flex flex-col gap-1.5">
+                      <button onClick={() => { navigator.clipboard.writeText(selectedPromo.couponCode); toast.success('Đã copy mã!') }}
+                        className="px-3 py-2 rounded-xl text-xs font-bold"
+                        style={{ background: 'rgba(168,85,247,0.15)', color: 'var(--color-primary)', border: '1px solid rgba(168,85,247,0.3)' }}>
+                        Copy
+                      </button>
+                      {onUseCoupon && (
+                        <button onClick={() => { onUseCoupon(selectedPromo.couponCode); setSelectedPromo(null) }}
+                          className="px-3 py-2 rounded-xl text-xs font-bold"
+                          style={{ background: 'linear-gradient(135deg,var(--color-primary),var(--color-primary-dark))', color: 'white' }}>
+                          Dùng ngay →
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 
-                {/* Kiểm tra đối tượng */}
                 <div className="p-3 rounded-xl space-y-2" style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.2)' }}>
                   <div className="text-xs font-semibold" style={{ color: '#34D399' }}>✅ Kiểm tra khách có đủ điều kiện</div>
                   <div className="flex gap-2">

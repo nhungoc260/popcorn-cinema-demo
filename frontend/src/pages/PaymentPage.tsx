@@ -147,8 +147,14 @@ export default function PaymentPage() {
   }
 
   const { mutate: initiate, isPending: initiating } = useMutation({
-    mutationFn: () => paymentApi.initiate(bookingId!, method, finalAmount, discount?.actualPointsUsed || 0),
-    onSuccess: ({ data }) => {
+      mutationFn: () => paymentApi.initiate(
+        bookingId!, 
+        method, 
+        finalAmount, 
+        discount?.actualPointsUsed || 0,
+        couponResult?.code || undefined
+      ),
+      onSuccess: ({ data }) => {
       setQrData(data.data.qrData)
       setTxnId(data.data.transactionId)
       setRequiresConfirmation(data.data.requiresConfirmation || false)

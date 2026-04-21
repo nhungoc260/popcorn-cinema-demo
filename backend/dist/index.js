@@ -31,6 +31,7 @@ const report_routes_1 = __importDefault(require("./routes/report.routes"));
 const ai_routes_1 = __importDefault(require("./routes/ai.routes"));
 const membership_routes_1 = __importDefault(require("./routes/membership.routes"));
 const support_routes_1 = __importDefault(require("./routes/support.routes"));
+const models_1 = require("./models");
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app);
 exports.server = server;
@@ -62,6 +63,15 @@ app.use(`${API}/reports`, report_routes_1.default);
 app.use(`${API}/ai`, ai_routes_1.default);
 app.use(`${API}/membership`, membership_routes_1.default);
 app.use(`${API}/support`, support_routes_1.default);
+app.get(`${API}/promotions`, async (_req, res) => {
+    try {
+        const promotions = await models_1.Promotion.find({ isActive: true }).sort({ createdAt: -1 }).lean();
+        res.json({ success: true, data: promotions });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
 app.get('/health', (_, res) => res.json({ status: 'ok', time: new Date() }));
 app.use(express_1.default.static(path_1.default.join(process.cwd(), 'public')));
 app.get('*', (_, res) => {

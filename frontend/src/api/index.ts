@@ -133,7 +133,7 @@ export const bookingApi = {
 
 // ── Payments ───────────────────────────────────────────────
 export const paymentApi = {
-  initiate: (bookingId: string, method: string, finalAmount?: number, pointsUsed?: number) => api.post('/payments/initiate', { bookingId, method, finalAmount, pointsUsed }),
+  initiate: (bookingId: string, method: string, finalAmount?: number, pointsUsed?: number, couponCode?: string) => api.post('/payments/initiate', { bookingId, method, finalAmount, pointsUsed, couponCode }),
   confirm: (transactionId: string) => api.post('/payments/confirm', { transactionId }),
   adminConfirm: (paymentId: string) => api.post('/payments/admin-confirm', { paymentId }),
   adminReject: (paymentId: string, reason: string) => api.post('/payments/admin-reject', { paymentId, reason }),

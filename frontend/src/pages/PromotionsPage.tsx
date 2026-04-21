@@ -54,7 +54,7 @@ export default function PromotionsPage() {
 
   const { data: promotionsData } = useQuery({
     queryKey: ['promotions-public'],
-    queryFn: () => api.get('/admin/promotions'), // ✅ SỬA: đổi '/promotions' → '/admin/promotions'
+    queryFn: () => api.get('/promotions'), 
     select: d => d.data.data,
   })
   const promotions: any[] = promotionsData || []

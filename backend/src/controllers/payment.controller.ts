@@ -9,7 +9,7 @@ import { getIO } from '../socket/socketServer';
 // POST /payments/initiate
 export async function initiatePayment(req: AuthRequest, res: Response) {
   try {
-    const { bookingId, method, finalAmount, pointsUsed = 0 } = req.body;
+    const { bookingId, method, finalAmount, pointsUsed = 0, couponCode } = req.body;
     const booking = await Booking.findById(bookingId);
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
     if (booking.status === 'confirmed') return res.status(400).json({ success: false, message: 'Already paid' });
@@ -58,11 +58,9 @@ export async function initiatePayment(req: AuthRequest, res: Response) {
 
     const paymentStatus = method === 'cash' ? 'pending' : 'pending_confirmation';
 
-    // Nếu người gọi là staff/admin và booking.user khác req.user → bán hộ
     const isSellingForCustomer = ['admin', 'staff'].includes(req.user?.role || '')
       && booking.user.toString() !== req.user!.id;
 
-    // Dùng finalAmount (sau giảm giá điểm + hạng thẻ) làm số tiền thực tế
     const actualAmount = (finalAmount && finalAmount > 0 && finalAmount <= booking.totalAmount)
       ? finalAmount
       : booking.totalAmount;
@@ -71,9 +69,10 @@ export async function initiatePayment(req: AuthRequest, res: Response) {
       booking: bookingId,
       user: booking.user,
       soldBy: isSellingForCustomer ? req.user!.id : undefined,
-      amount: actualAmount,            // số tiền THỰC TẾ khách trả (sau giảm giá)
-      originalAmount: booking.totalAmount, // giá gốc để tham chiếu
-      pointsUsed: pointsUsed || 0,        // số điểm đã dùng để giảm giá
+      amount: actualAmount,
+      originalAmount: booking.totalAmount,
+      pointsUsed: pointsUsed || 0,
+      couponCode: couponCode || null, // ✅ Lưu mã coupon vào payment
       method,
       transactionId,
       qrData,
@@ -104,7 +103,6 @@ export async function confirmPayment(req: AuthRequest, res: Response) {
     const payment = await Payment.findOne({ transactionId });
     if (!payment) return res.status(404).json({ success: false, message: 'Payment not found' });
 
-    // Tất cả user khi tự mua online đều phải chờ staff/admin khác duyệt
     payment.status = 'customer_confirmed' as any;
     await payment.save();
     return res.json({ success: true, requiresAdminConfirm: true, message: 'Đã ghi nhận! Nhân viên sẽ xác nhận trong vài phút.' });
@@ -227,10 +225,10 @@ async function doConfirmPayment(payment: any, confirmedBy?: string) {
   const booking = await Booking.findById(payment.booking);
   if (!booking) throw new Error('Booking not found');
 
-  // 1. Cập nhật trạng thái booking + lưu số tiền thực tế đã thanh toán
+  // 1. Cập nhật trạng thái booking
   booking.status = 'confirmed';
   booking.paymentId = payment._id;
-  (booking as any).paidAmount = payment.amount; // số tiền thực tế sau giảm giá
+  (booking as any).paidAmount = payment.amount;
   await booking.save();
 
   // 2. Cập nhật ghế trong Showtime
@@ -264,7 +262,21 @@ async function doConfirmPayment(payment: any, confirmedBy?: string) {
     console.error('⚠️ Tạo Ticket thất bại:', ticketErr);
   }
 
-  // 5. Cộng điểm loyalty — chỉ áp dụng cho customer
+  // ✅ 5. Tăng usedCount của coupon nếu có dùng mã
+  if (payment.couponCode) {
+    try {
+      const { Coupon } = await import('../models');
+      await Coupon.findOneAndUpdate(
+        { code: payment.couponCode.toUpperCase(), isActive: true },
+        { $inc: { usedCount: 1 } }
+      );
+      console.log(`✅ Coupon ${payment.couponCode} usedCount +1`);
+    } catch (couponErr) {
+      console.error('⚠️ Cập nhật coupon usedCount thất bại:', couponErr);
+    }
+  }
+
+  // 6. Cộng điểm loyalty
   const bookingUser = await User.findById(booking.user).select('role').lean() as any;
   const isCustomer = bookingUser?.role === 'customer';
   const pointsEarned = isCustomer ? Math.floor(booking.totalAmount / 1000) : 0;
@@ -272,7 +284,7 @@ async function doConfirmPayment(payment: any, confirmedBy?: string) {
 
   if (isCustomer) {
     const pointsUsed = (payment as any).pointsUsed || 0;
-    const netPoints = pointsEarned - pointsUsed; // cộng điểm mới, trừ điểm đã dùng
+    const netPoints = pointsEarned - pointsUsed;
 
     const historyEntries: any[] = [
       { action: 'earn', points: pointsEarned, date: new Date(), ref: booking.bookingCode },
@@ -285,9 +297,9 @@ async function doConfirmPayment(payment: any, confirmedBy?: string) {
       { user: booking.user },
       {
         $inc: {
-          points: netPoints,           // cộng điểm mới - trừ điểm đã dùng
-          totalEarned: pointsEarned,   // tổng tích luỹ chỉ cộng, không trừ
-          totalSpent: pointsUsed,      // tổng đã dùng
+          points: netPoints,
+          totalEarned: pointsEarned,
+          totalSpent: pointsUsed,
         },
         $push: { history: { $each: historyEntries } },
         $setOnInsert: { user: booking.user },
@@ -295,7 +307,7 @@ async function doConfirmPayment(payment: any, confirmedBy?: string) {
       { upsert: true, new: true }
     );
 
-    // 6. Cập nhật hạng thẻ
+    // 7. Cập nhật hạng thẻ
     if (loyalty) {
       let tier: 'bronze' | 'silver' | 'gold' | 'platinum' = 'bronze';
       if (loyalty.totalEarned >= 5000) tier = 'platinum';
@@ -306,7 +318,7 @@ async function doConfirmPayment(payment: any, confirmedBy?: string) {
     }
   }
 
-  // 7. Emit socket events
+  // 8. Emit socket events
   const io = getIO();
   const showtimeId = booking.showtime.toString();
   const seatIds = booking.seats.map((s: any) => s.toString());
@@ -346,6 +358,7 @@ async function generateVietQR(amount: number, bookingCode: string): Promise<stri
 async function generateBankQR(amount: number, bookingCode: string): Promise<string> {
   return QRCode.toDataURL(`STK:1036219239|NH:Vietcombank|TEN:NGUYEN TRAN NHU NGOC|ST:${amount}|ND:POPCORN ${bookingCode}`);
 }
+
 // GET /payments/by-booking/:bookingId
 export async function getPaymentByBooking(req: AuthRequest, res: Response) {
   try {

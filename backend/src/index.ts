@@ -26,7 +26,8 @@ import couponRoutes from './routes/coupon.routes';
 import reportRoutes from './routes/report.routes';
 import aiRoutes from './routes/ai.routes';
 import membershipRoutes from './routes/membership.routes';
-import supportRoutes from './routes/support.routes'
+import supportRoutes from './routes/support.routes';
+import { Promotion } from './models';
 
 const app = express();
 const server = http.createServer(app);
@@ -60,7 +61,17 @@ app.use(`${API}/coupons`, couponRoutes);
 app.use(`${API}/reports`, reportRoutes);
 app.use(`${API}/ai`, aiRoutes);
 app.use(`${API}/membership`, membershipRoutes);
-app.use(`${API}/support`, supportRoutes)
+app.use(`${API}/support`, supportRoutes);
+
+app.get(`${API}/promotions`, async (_req, res) => {
+  try {
+    const promotions = await Promotion.find({ isActive: true }).sort({ createdAt: -1 }).lean();
+    res.json({ success: true, data: promotions });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 app.get('/health', (_, res) => res.json({ status: 'ok', time: new Date() }));
 app.use(express.static(path.join(process.cwd(), 'public')));
 app.get('*', (_, res) => {

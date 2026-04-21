@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -19,7 +52,7 @@ const socketServer_1 = require("../socket/socketServer");
 // POST /payments/initiate
 async function initiatePayment(req, res) {
     try {
-        const { bookingId, method, finalAmount, pointsUsed = 0 } = req.body;
+        const { bookingId, method, finalAmount, pointsUsed = 0, couponCode } = req.body;
         const booking = await models_1.Booking.findById(bookingId);
         if (!booking)
             return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -67,10 +100,8 @@ async function initiatePayment(req, res) {
             qrData = await generateBankQR(booking.totalAmount, booking.bookingCode);
         }
         const paymentStatus = method === 'cash' ? 'pending' : 'pending_confirmation';
-        // Nếu người gọi là staff/admin và booking.user khác req.user → bán hộ
         const isSellingForCustomer = ['admin', 'staff'].includes(req.user?.role || '')
             && booking.user.toString() !== req.user.id;
-        // Dùng finalAmount (sau giảm giá điểm + hạng thẻ) làm số tiền thực tế
         const actualAmount = (finalAmount && finalAmount > 0 && finalAmount <= booking.totalAmount)
             ? finalAmount
             : booking.totalAmount;
@@ -78,9 +109,10 @@ async function initiatePayment(req, res) {
             booking: bookingId,
             user: booking.user,
             soldBy: isSellingForCustomer ? req.user.id : undefined,
-            amount: actualAmount, // số tiền THỰC TẾ khách trả (sau giảm giá)
-            originalAmount: booking.totalAmount, // giá gốc để tham chiếu
-            pointsUsed: pointsUsed || 0, // số điểm đã dùng để giảm giá
+            amount: actualAmount,
+            originalAmount: booking.totalAmount,
+            pointsUsed: pointsUsed || 0,
+            couponCode: couponCode || null, // ✅ Lưu mã coupon vào payment
             method,
             transactionId,
             qrData,
@@ -109,7 +141,6 @@ async function confirmPayment(req, res) {
         const payment = await models_1.Payment.findOne({ transactionId });
         if (!payment)
             return res.status(404).json({ success: false, message: 'Payment not found' });
-        // Tất cả user khi tự mua online đều phải chờ staff/admin khác duyệt
         payment.status = 'customer_confirmed';
         await payment.save();
         return res.json({ success: true, requiresAdminConfirm: true, message: 'Đã ghi nhận! Nhân viên sẽ xác nhận trong vài phút.' });
@@ -226,10 +257,10 @@ async function doConfirmPayment(payment, confirmedBy) {
     const booking = await models_1.Booking.findById(payment.booking);
     if (!booking)
         throw new Error('Booking not found');
-    // 1. Cập nhật trạng thái booking + lưu số tiền thực tế đã thanh toán
+    // 1. Cập nhật trạng thái booking
     booking.status = 'confirmed';
     booking.paymentId = payment._id;
-    booking.paidAmount = payment.amount; // số tiền thực tế sau giảm giá
+    booking.paidAmount = payment.amount;
     await booking.save();
     // 2. Cập nhật ghế trong Showtime
     await models_1.Showtime.findByIdAndUpdate(booking.showtime, {
@@ -256,14 +287,25 @@ async function doConfirmPayment(payment, confirmedBy) {
     catch (ticketErr) {
         console.error('⚠️ Tạo Ticket thất bại:', ticketErr);
     }
-    // 5. Cộng điểm loyalty — chỉ áp dụng cho customer
+    // ✅ 5. Tăng usedCount của coupon nếu có dùng mã
+    if (payment.couponCode) {
+        try {
+            const { Coupon } = await Promise.resolve().then(() => __importStar(require('../models')));
+            await Coupon.findOneAndUpdate({ code: payment.couponCode.toUpperCase(), isActive: true }, { $inc: { usedCount: 1 } });
+            console.log(`✅ Coupon ${payment.couponCode} usedCount +1`);
+        }
+        catch (couponErr) {
+            console.error('⚠️ Cập nhật coupon usedCount thất bại:', couponErr);
+        }
+    }
+    // 6. Cộng điểm loyalty
     const bookingUser = await models_1.User.findById(booking.user).select('role').lean();
     const isCustomer = bookingUser?.role === 'customer';
     const pointsEarned = isCustomer ? Math.floor(booking.totalAmount / 1000) : 0;
     let loyalty = null;
     if (isCustomer) {
         const pointsUsed = payment.pointsUsed || 0;
-        const netPoints = pointsEarned - pointsUsed; // cộng điểm mới, trừ điểm đã dùng
+        const netPoints = pointsEarned - pointsUsed;
         const historyEntries = [
             { action: 'earn', points: pointsEarned, date: new Date(), ref: booking.bookingCode },
         ];
@@ -272,14 +314,14 @@ async function doConfirmPayment(payment, confirmedBy) {
         }
         loyalty = await models_1.Loyalty.findOneAndUpdate({ user: booking.user }, {
             $inc: {
-                points: netPoints, // cộng điểm mới - trừ điểm đã dùng
-                totalEarned: pointsEarned, // tổng tích luỹ chỉ cộng, không trừ
-                totalSpent: pointsUsed, // tổng đã dùng
+                points: netPoints,
+                totalEarned: pointsEarned,
+                totalSpent: pointsUsed,
             },
             $push: { history: { $each: historyEntries } },
             $setOnInsert: { user: booking.user },
         }, { upsert: true, new: true });
-        // 6. Cập nhật hạng thẻ
+        // 7. Cập nhật hạng thẻ
         if (loyalty) {
             let tier = 'bronze';
             if (loyalty.totalEarned >= 5000)
@@ -292,7 +334,7 @@ async function doConfirmPayment(payment, confirmedBy) {
             await loyalty.save();
         }
     }
-    // 7. Emit socket events
+    // 8. Emit socket events
     const io = (0, socketServer_1.getIO)();
     const showtimeId = booking.showtime.toString();
     const seatIds = booking.seats.map((s) => s.toString());

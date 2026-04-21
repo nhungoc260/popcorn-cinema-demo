@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Film, Calendar, Building2, Zap,
   Users, BarChart3, CreditCard, QrCode, ShoppingCart,
-  ChevronLeft, ChevronRight, LogOut, Menu, X, Globe, FileText
+  ChevronLeft, ChevronRight, LogOut, Menu, X, Globe, FileText, Tag
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import Logo from '../ui/Logo'
@@ -38,6 +38,7 @@ const ADMIN_NAV = [
     label: 'Người dùng & Báo cáo',
     items: [
       { href: '/admin/users',    label: 'Người dùng', icon: Users },
+      { href: '/promotions', label: 'Khuyến mãi', icon: Tag },
       { href: '/admin/invoices', label: 'Hóa đơn',    icon: FileText },
       { href: '/admin/reports',  label: 'Báo cáo',    icon: BarChart3 },
     ]

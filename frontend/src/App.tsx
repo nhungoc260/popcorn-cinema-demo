@@ -21,6 +21,7 @@ import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import NotFoundPage from './pages/NotFoundPage'
 import InvoicePage from './pages/InvoicePage'
+import PromotionsPage from './pages/PromotionsPage'
 
 // Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard'
@@ -181,6 +182,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="promotions" element={<PromotionsPage />} />
 
         {/* ── Admin ── */}
         <Route path="/admin" element={<AdminLayoutGuard roles={['admin', 'staff']} />}>

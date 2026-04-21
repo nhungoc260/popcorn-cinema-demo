@@ -6,7 +6,7 @@ const errorHandler_1 = require("../middleware/errorHandler");
 const r = (0, express_1.Router)();
 // ── User routes ──
 r.post('/validate', errorHandler_1.authenticate, coupon_controller_1.validateCoupon);
-r.post('/apply', errorHandler_1.authenticate, coupon_controller_1.applyCoupon);
+r.post('/apply', errorHandler_1.authenticateOptional, coupon_controller_1.applyCoupon);
 r.get('/loyalty', errorHandler_1.authenticate, coupon_controller_1.getMyLoyalty);
 // ── Admin + Staff routes ──
 r.get('/', errorHandler_1.authenticate, (0, errorHandler_1.authorize)('admin', 'staff'), coupon_controller_1.getCoupons);

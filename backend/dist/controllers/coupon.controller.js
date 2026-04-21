@@ -33,7 +33,6 @@ async function validateCoupon(req, res) {
     }
 }
 // POST /coupons/apply
-// POST /coupons/apply
 async function applyCoupon(req, res) {
     try {
         const { code, orderAmount } = req.body;
@@ -44,11 +43,16 @@ async function applyCoupon(req, res) {
             return res.status(400).json({ success: false, message: 'Mã đã hết hạn' });
         if (coupon.usedCount >= coupon.usageLimit)
             return res.status(400).json({ success: false, message: 'Mã đã hết lượt sử dụng' });
-        if (coupon.usedBy.map((id) => id.toString()).includes(req.user.id))
-            return res.status(400).json({ success: false, message: 'Bạn đã sử dụng mã này rồi' });
         if (orderAmount < coupon.minOrder)
             return res.status(400).json({ success: false, message: `Đơn tối thiểu ${coupon.minOrder.toLocaleString('vi')}đ` });
+        // ── FIX: Nếu coupon có eligibleTiers → bắt buộc phải đăng nhập ──
         if (coupon.eligibleTiers && coupon.eligibleTiers.length > 0) {
+            if (!req.user) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Vui lòng đăng nhập để sử dụng mã này'
+                });
+            }
             const loyalty = await models_1.Loyalty.findOne({ user: req.user.id });
             const userTier = loyalty?.tier || 'bronze';
             if (!coupon.eligibleTiers.includes(userTier)) {
@@ -62,10 +66,17 @@ async function applyCoupon(req, res) {
                 });
             }
         }
+        // ── FIX: Kiểm tra đã dùng mã chưa (chỉ khi đã đăng nhập) ──
+        if (req.user && coupon.usedBy.map((id) => id.toString()).includes(req.user.id)) {
+            return res.status(400).json({ success: false, message: 'Bạn đã sử dụng mã này rồi' });
+        }
         const discountAmount = coupon.type === 'percent'
             ? Math.min(Math.round(orderAmount * coupon.value / 100), coupon.maxDiscount)
             : Math.min(coupon.value, coupon.maxDiscount);
-        return res.json({ success: true, data: { code: coupon.code, type: coupon.type, value: coupon.value, discountAmount } });
+        return res.json({
+            success: true,
+            data: { code: coupon.code, type: coupon.type, value: coupon.value, discountAmount }
+        });
     }
     catch (err) {
         return res.status(500).json({ success: false, message: err.message });

@@ -9,4 +9,5 @@ export interface AuthRequest extends Request {
 export declare function authenticate(req: AuthRequest, res: Response, next: NextFunction): Promise<Response<any, Record<string, any>> | undefined>;
 export declare function authorize(...roles: string[]): (req: AuthRequest, res: Response, next: NextFunction) => Response<any, Record<string, any>> | undefined;
 export declare function errorHandler(err: any, req: Request, res: Response, _next: NextFunction): void;
+export declare function authenticateOptional(req: AuthRequest, res: Response, next: NextFunction): Promise<void>;
 //# sourceMappingURL=errorHandler.d.ts.map

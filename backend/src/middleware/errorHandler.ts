@@ -42,3 +42,19 @@ export function errorHandler(err: any, req: Request, res: Response, _next: NextF
   const message = err.message || 'Internal Server Error';
   res.status(status).json({ success: false, message, stack: process.env.NODE_ENV === 'development' ? err.stack : undefined });
 }
+
+export async function authenticateOptional(req: AuthRequest, res: Response, next: NextFunction) {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return next(); // Không có token → tiếp tục bình thường
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET!) as { id: string; role: string; email: string };
+    const user = await User.findById(decoded.id).select('isActive').lean() as any;
+    if (user && user.isActive !== false) {
+      req.user = decoded; // Chỉ set nếu tài khoản hợp lệ
+    }
+  } catch {
+    // Token lỗi → bỏ qua, không báo lỗi
+  }
+  next();
+}

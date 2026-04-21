@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { validateCoupon, applyCoupon, getMyLoyalty, getCoupons, createCoupon, deleteCoupon } from '../controllers/coupon.controller';
-import { authenticate, authorize } from '../middleware/errorHandler';
+import { authenticate, authorize, authenticateOptional } from '../middleware/errorHandler';
 
 const r = Router();
 
 // ── User routes ──
 r.post('/validate', authenticate, validateCoupon);
-r.post('/apply', authenticate, applyCoupon);
+r.post('/apply', authenticateOptional, applyCoupon);
 r.get('/loyalty', authenticate, getMyLoyalty);
 
 // ── Admin + Staff routes ──

@@ -234,7 +234,9 @@ export default function PromotionsPage() {
                 style={{ background: p.imageUrl ? undefined : (p.gradient || 'linear-gradient(135deg,#4C1D95,#7C3AED)') }}>
                 {p.imageUrl
                   ? <img src={p.imageUrl} alt={p.title} className="w-full h-full object-cover" />
-                  : <span className="text-5xl drop-shadow-lg">{p.emoji || '🎁'}</span>
+                  : <span className="text-5xl drop-shadow-lg">
+                        {p.emoji || [...(p.title || '')][0] || '🎁'}
+                    </span>
                 }
                 <div className="absolute top-2.5 right-2.5">
                   <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(0,0,0,0.35)', color: 'white', backdropFilter: 'blur(4px)' }}>{p.tag}</span>

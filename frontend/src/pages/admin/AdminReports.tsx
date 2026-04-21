@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, TrendingUp, Users, Ticket, DollarSign, BarChart3, Film, RefreshCw } from 'lucide-react'
+import { ArrowLeft, TrendingUp, Users, Ticket, DollarSign, BarChart3, Film, RefreshCw, Tag } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import api, { analyticsApi } from '../../api'
 
@@ -19,42 +19,28 @@ const PERIODS = [
   { value: 'year', label: 'Theo Năm' },
 ]
 
-// ── Xuất CSV đầy đủ ──────────────────────────────────────
 function exportCSV(report: any, revenue: any[], period: string) {
   const periodLabel = period === 'day' ? '30 ngày' : period === 'month' ? '12 tháng' : 'theo năm'
   const dateStr = new Date().toLocaleDateString('vi-VN')
   const lines: string[] = []
-
   lines.push(`BÁO CÁO DOANH THU POPCORN CINEMA`)
   lines.push(`Kỳ báo cáo: ${periodLabel} | Xuất ngày: ${dateStr}`)
   lines.push(``)
-
-  // Tổng quan
   lines.push(`=== TỔNG QUAN ===`)
   lines.push(`Tổng doanh thu,${report?.summary?.totalRevenue || 0}`)
   lines.push(`Tổng giao dịch,${report?.summary?.totalTransactions || 0}`)
   lines.push(`Người dùng mới tháng này,${report?.newUsersThisMonth || 0}`)
   lines.push(``)
-
-  // Doanh thu theo thời gian
   lines.push(`=== DOANH THU THEO THỜI GIAN ===`)
   lines.push(`Thời gian,Doanh thu (VND),Số giao dịch`)
-  revenue.forEach((r: any) => {
-    lines.push(`${r._id},${r.total},${r.count}`)
-  })
+  revenue.forEach((r: any) => { lines.push(`${r._id},${r.total},${r.count}`) })
   lines.push(``)
-
-  // Top phim
   if (report?.topMovies?.length) {
     lines.push(`=== TOP PHIM DOANH THU ===`)
     lines.push(`Hạng,Tên phim,Doanh thu (VND),Số ghế`)
-    report.topMovies.forEach((m: any, i: number) => {
-      lines.push(`${i + 1},"${m.title}",${m.revenue},${m.totalSeats}`)
-    })
+    report.topMovies.forEach((m: any, i: number) => { lines.push(`${i + 1},"${m.title}",${m.revenue},${m.totalSeats}`) })
     lines.push(``)
   }
-
-  // Trạng thái đặt vé
   if (report?.bookingStats?.length) {
     lines.push(`=== TRẠNG THÁI ĐẶT VÉ ===`)
     lines.push(`Trạng thái,Số lượng`)
@@ -62,11 +48,8 @@ function exportCSV(report: any, revenue: any[], period: string) {
       confirmed: 'Đã xác nhận', pending: 'Chờ thanh toán',
       cancelled: 'Đã hủy', checked_in: 'Đã check-in', pending_payment: 'Chờ CK'
     }
-    report.bookingStats.forEach((b: any) => {
-      lines.push(`${statusMap[b._id] || b._id},${b.count}`)
-    })
+    report.bookingStats.forEach((b: any) => { lines.push(`${statusMap[b._id] || b._id},${b.count}`) })
   }
-
   const csv = lines.join('\n')
   const a = document.createElement('a')
   a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv)
@@ -74,7 +57,6 @@ function exportCSV(report: any, revenue: any[], period: string) {
   a.click()
 }
 
-// ── In PDF: mở cửa sổ in với nội dung sạch ──────────────
 function printReport(report: any, revenue: any[], period: string, stats: any) {
   const periodLabel = period === 'day' ? '30 ngày gần nhất' : period === 'month' ? '12 tháng gần nhất' : 'theo năm'
   const dateStr = new Date().toLocaleString('vi-VN')
@@ -82,19 +64,15 @@ function printReport(report: any, revenue: any[], period: string, stats: any) {
     confirmed: 'Đã xác nhận', pending: 'Chờ thanh toán',
     cancelled: 'Đã hủy', checked_in: 'Đã check-in', pending_payment: 'Chờ CK'
   }
-
   const revenueRows = revenue.map(r =>
     `<tr><td>${r._id}</td><td style="text-align:right">${r.total.toLocaleString('vi-VN')}đ</td><td style="text-align:right">${r.count}</td></tr>`
   ).join('')
-
   const topMovieRows = (report?.topMovies || []).map((m: any, i: number) =>
     `<tr><td>${i + 1}</td><td>${m.title}</td><td style="text-align:right">${m.revenue.toLocaleString('vi-VN')}đ</td><td style="text-align:right">${m.totalSeats}</td></tr>`
   ).join('')
-
   const bookingRows = (report?.bookingStats || []).map((b: any) =>
     `<tr><td>${statusMap[b._id] || b._id}</td><td style="text-align:right">${b.count}</td></tr>`
   ).join('')
-
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <title>Báo Cáo Doanh Thu — Popcorn Cinema</title>
@@ -116,29 +94,23 @@ function printReport(report: any, revenue: any[], period: string, stats: any) {
 </style></head><body>
   <h1>📊 Báo Cáo Doanh Thu — Popcorn Cinema</h1>
   <div class="meta">Kỳ: ${periodLabel} &nbsp;|&nbsp; Xuất lúc: ${dateStr}</div>
-
   <div class="summary">
     <div class="card"><div class="label">Tổng Doanh Thu</div><div class="value">${(report?.summary?.totalRevenue || 0).toLocaleString('vi-VN')}đ</div><div class="sub">${report?.summary?.totalTransactions || 0} giao dịch</div></div>
     <div class="card"><div class="label">Tổng Đặt Vé</div><div class="value">${stats?.totalBookings ?? 0}</div><div class="sub">Vé hôm nay: ${stats?.todayBookings ?? 0}</div></div>
     <div class="card"><div class="label">Người Dùng Mới</div><div class="value">${report?.newUsersThisMonth || 0}</div><div class="sub">Tháng này</div></div>
     <div class="card"><div class="label">Phim Đang Chiếu</div><div class="value">${stats?.totalMovies ?? 0}</div><div class="sub">now_showing</div></div>
   </div>
-
   <h2>Doanh Thu Theo Thời Gian</h2>
   <table><thead><tr><th>Thời gian</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">Giao dịch</th></tr></thead>
   <tbody>${revenueRows}</tbody></table>
-
   ${topMovieRows ? `<h2>Top Phim Doanh Thu</h2>
   <table><thead><tr><th>#</th><th>Tên phim</th><th style="text-align:right">Doanh thu</th><th style="text-align:right">Số ghế</th></tr></thead>
   <tbody>${topMovieRows}</tbody></table>` : ''}
-
   ${bookingRows ? `<h2>Trạng Thái Đặt Vé</h2>
   <table><thead><tr><th>Trạng thái</th><th style="text-align:right">Số lượng</th></tr></thead>
   <tbody>${bookingRows}</tbody></table>` : ''}
-
   <div class="footer">Popcorn Cinema — Báo cáo tự động | ${dateStr}</div>
 </body></html>`
-
   const w = window.open('', '_blank', 'width=900,height=700')
   if (!w) return
   w.document.write(html)
@@ -154,8 +126,8 @@ export default function AdminReports() {
     queryKey: ['user-trends'],
     queryFn: () => analyticsApi.getUserTrends(),
     select: (d: any) => d.data.data,
-  });
-  const trends = trendsData as any;
+  })
+  const trends = trendsData as any
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['admin-reports', period],
@@ -164,14 +136,20 @@ export default function AdminReports() {
     refetchInterval: 30000,
   })
 
+  // 🆕 Thống kê coupon
+  const { data: couponStatsData } = useQuery({
+    queryKey: ['coupon-stats'],
+    queryFn: () => api.get('/admin/coupon-stats'),
+    select: d => d.data.data,
+  })
+  const couponStats = couponStatsData as any
+
   const report = data as any
   const rawRevenue: any[] = report?.revenue || []
 
-  // Fill đủ điểm dữ liệu theo period — tháng/ngày không có data → total: 0
   const revenue = (() => {
     const now = new Date()
     if (period === 'month') {
-      // Fill đủ 12 tháng gần nhất
       return Array.from({ length: 12 }, (_, i) => {
         const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1)
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -180,7 +158,6 @@ export default function AdminReports() {
       })
     }
     if (period === 'day') {
-      // Fill đủ 30 ngày gần nhất
       return Array.from({ length: 30 }, (_, i) => {
         const d = new Date(now)
         d.setDate(d.getDate() - 29 + i)
@@ -190,7 +167,6 @@ export default function AdminReports() {
       })
     }
     if (period === 'year') {
-      // Fill đủ 5 năm gần nhất
       return Array.from({ length: 5 }, (_, i) => {
         const key = String(now.getFullYear() - 4 + i)
         const found = rawRevenue.find((r: any) => r._id === key)
@@ -201,7 +177,6 @@ export default function AdminReports() {
   })()
   const maxRev = Math.max(...revenue.map((r: any) => r.total), 1)
 
-  // Stats from admin dashboard too
   const { data: dash } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: () => api.get('/admin/dashboard'),
@@ -229,7 +204,7 @@ export default function AdminReports() {
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
       {/* Header */}
-      <div className="border-b border-b px-6 py-4 flex items-center justify-between"
+      <div className="border-b px-6 py-4 flex items-center justify-between"
         style={{ background: 'var(--color-bg-2)', backdropFilter: 'blur(12px)', borderColor: 'rgba(168,85,247,0.1)' }}>
         <div className="flex items-center gap-3">
           <Link to="/admin"><ArrowLeft className="w-5 h-5" style={{ color: 'var(--color-text-muted)' }} /></Link>
@@ -293,53 +268,23 @@ export default function AdminReports() {
             </div>
             <TrendingUp className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
           </div>
-
           {isLoading ? (
             <div className="h-56 flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.7)' }}>Đang tải...</div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={revenue} margin={{ top: 4, right: 4, left: 8, bottom: 0 }} barCategoryGap="30%">
-                <XAxis
-                  dataKey="_id"
-                  tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v: string) =>
-                    period === 'day' ? v.slice(5) : period === 'month' ? v.slice(5) : v
-                  }
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v: number) => v === 0 ? '0' : fmtM(v)}
-                  width={44}
-                />
-                <Tooltip
-                  cursor={{ fill: 'rgba(168,85,247,0.08)' }}
-                  contentStyle={{
-                    background: 'var(--color-bg-2)',
-                    border: '1px solid rgba(168,85,247,0.3)',
-                    borderRadius: 10,
-                    fontSize: 12,
-                  }}
+                <XAxis dataKey="_id" tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }} axisLine={false} tickLine={false}
+                  tickFormatter={(v: string) => period === 'day' ? v.slice(5) : period === 'month' ? v.slice(5) : v} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }} axisLine={false} tickLine={false}
+                  tickFormatter={(v: number) => v === 0 ? '0' : fmtM(v)} width={44} />
+                <Tooltip cursor={{ fill: 'rgba(168,85,247,0.08)' }}
+                  contentStyle={{ background: 'var(--color-bg-2)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 10, fontSize: 12 }}
                   labelStyle={{ color: 'var(--color-text-muted)', marginBottom: 4 }}
-                  formatter={(value: number, _: any, props: any) => [
-                    `${value.toLocaleString('vi-VN')}đ — ${props.payload.count} giao dịch`,
-                    'Doanh thu',
-                  ]}
-                />
+                  formatter={(value: number, _: any, props: any) => [`${value.toLocaleString('vi-VN')}đ — ${props.payload.count} giao dịch`, 'Doanh thu']} />
                 <Bar dataKey="total" radius={[6, 6, 0, 0]} maxBarSize={40}>
                   {revenue.map((r: any, i: number) => (
-                    <Cell
-                      key={i}
-                      fill={r.total === maxRev && r.total > 0
-                        ? 'var(--color-primary)'
-                        : r.total === 0
-                          ? 'rgba(255,255,255,0.06)'
-                          : 'rgba(168,85,247,0.45)'
-                      }
-                    />
+                    <Cell key={i}
+                      fill={r.total === maxRev && r.total > 0 ? 'var(--color-primary)' : r.total === 0 ? 'rgba(255,255,255,0.06)' : 'rgba(168,85,247,0.45)'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -369,7 +314,6 @@ export default function AdminReports() {
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold truncate" style={{ color: 'var(--color-text)' }}>{m.title}</div>
                       <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{m.totalSeats} ghế</div>
-                      {/* Revenue bar */}
                       <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
                         <div className="h-full rounded-full" style={{ width: `${(m.revenue / (report.topMovies[0]?.revenue || 1)) * 100}%`, background: 'linear-gradient(90deg, var(--color-primary), #FDE68A)' }} />
                       </div>
@@ -383,7 +327,7 @@ export default function AdminReports() {
             )}
           </motion.div>
 
-          {/* Booking Status + Payment Methods */}
+          {/* Booking Status */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
             className="p-6 rounded-2xl space-y-5"
             style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
@@ -413,8 +357,6 @@ export default function AdminReports() {
                 )}
               </div>
             </div>
-
-            {/* Quick stats */}
             <div className="pt-4 border-t grid grid-cols-2 gap-3" style={{ borderColor: 'var(--color-glass-border)' }}>
               {[
                 { label: 'Tổng Đặt Vé', v: stats?.totalBookings ?? 0, c: 'var(--color-primary)' },
@@ -431,17 +373,86 @@ export default function AdminReports() {
           </motion.div>
         </div>
 
+        {/* 🆕 Thống kê Coupon */}
+        {couponStats && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.52 }}
+            className="p-6 rounded-2xl"
+            style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-bold flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
+                <Tag className="w-4 h-4" style={{ color: 'var(--color-primary)' }} /> Thống Kê Mã Giảm Giá
+              </h2>
+              <div className="flex gap-3">
+                <div className="text-center px-4 py-2 rounded-xl" style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
+                  <div className="font-black text-xl" style={{ color: 'var(--color-primary)' }}>{couponStats.totalUsed}</div>
+                  <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Tổng lượt dùng</div>
+                </div>
+                <div className="text-center px-4 py-2 rounded-xl" style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                  <div className="font-black text-xl" style={{ color: '#34D399' }}>{couponStats.totalCoupons}</div>
+                  <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Tổng mã</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {(couponStats.stats || []).map((c: any) => {
+                const isExpired = new Date(c.expiresAt) < new Date()
+                const isNearlyFull = c.usedPct >= 80
+                return (
+                  <div key={c.code} className="flex items-center gap-4 p-3 rounded-xl"
+                    style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}>
+                    <div className="font-mono font-black text-sm flex-shrink-0"
+                      style={{ color: isExpired ? 'var(--color-text-dim)' : 'var(--color-primary)', minWidth: 120 }}>
+                      {c.code}
+                    </div>
+                    <div className="text-xs flex-shrink-0" style={{ color: 'var(--color-text-muted)', minWidth: 80 }}>
+                      {c.type === 'percent' ? `−${c.value}%` : `−${c.value.toLocaleString('vi')}đ`}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between text-xs mb-1">
+                        <span style={{ color: 'var(--color-text-muted)' }}>{c.usedCount}/{c.usageLimit} lượt</span>
+                        <span style={{ color: isNearlyFull ? '#F87171' : 'var(--color-text-dim)' }}>{c.usedPct}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                        <div className="h-full rounded-full transition-all"
+                          style={{ width: `${c.usedPct}%`, background: isNearlyFull ? '#F87171' : 'var(--color-primary)' }} />
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5 flex-shrink-0">
+                      {isExpired && (
+                        <span className="text-xs px-2 py-0.5 rounded-full"
+                          style={{ background: 'rgba(248,113,113,0.1)', color: '#F87171' }}>Hết hạn</span>
+                      )}
+                      {isNearlyFull && !isExpired && (
+                        <span className="text-xs px-2 py-0.5 rounded-full"
+                          style={{ background: 'rgba(249,115,22,0.1)', color: '#F97316' }}>Sắp hết lượt</span>
+                      )}
+                      {!isExpired && !isNearlyFull && c.isActive && (
+                        <span className="text-xs px-2 py-0.5 rounded-full"
+                          style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }}>Đang hoạt động</span>
+                      )}
+                    </div>
+                    <div className="text-xs flex-shrink-0" style={{ color: 'var(--color-text-dim)' }}>
+                      HSD: {new Date(c.expiresAt).toLocaleDateString('vi-VN')}
+                    </div>
+                  </div>
+                )
+              })}
+              {!couponStats.stats?.length && (
+                <p className="text-sm text-center py-4" style={{ color: 'var(--color-text-muted)' }}>Chưa có mã nào</p>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {/* User Trends Section */}
         {trends && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
             className="p-6 rounded-2xl space-y-5"
             style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
-
             <h2 className="font-bold flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
               <Users className="w-4 h-4" style={{ color: '#F472B6' }} /> Xu Hướng Hành Vi Người Dùng
             </h2>
-
-            {/* Retention + User Groups */}
             <div className="grid grid-cols-4 gap-3">
               <div className="p-4 rounded-xl text-center col-span-1"
                 style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
@@ -449,9 +460,9 @@ export default function AdminReports() {
                 <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>Tỷ lệ quay lại</div>
               </div>
               {[
-                { label: 'Khách mới',       value: trends.userGroups?.casual  || 0, color: '#FDE68A' },
-                { label: 'Thường xuyên',    value: trends.userGroups?.regular || 0, color: 'var(--color-primary)' },
-                { label: 'Trung thành',     value: trends.userGroups?.loyal   || 0, color: '#F472B6' },
+                { label: 'Khách mới', value: trends.userGroups?.casual || 0, color: '#FDE68A' },
+                { label: 'Thường xuyên', value: trends.userGroups?.regular || 0, color: 'var(--color-primary)' },
+                { label: 'Trung thành', value: trends.userGroups?.loyal || 0, color: '#F472B6' },
               ].map(({ label, value, color }) => (
                 <div key={label} className="p-4 rounded-xl text-center"
                   style={{ background: `${color}0a`, border: `1px solid ${color}25` }}>
@@ -460,16 +471,12 @@ export default function AdminReports() {
                 </div>
               ))}
             </div>
-
-            {/* Genre Trends */}
             <div>
-              <div className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text-muted)' }}>
-                Thể loại phổ biến toàn hệ thống
-              </div>
+              <div className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text-muted)' }}>Thể loại phổ biến toàn hệ thống</div>
               <div className="space-y-2">
                 {(trends.genreTrends || []).map((g: any, i: number) => {
-                  const maxCount = trends.genreTrends[0]?.count || 1;
-                  const pct = Math.round(g.count / maxCount * 100);
+                  const maxCount = trends.genreTrends[0]?.count || 1
+                  const pct = Math.round(g.count / maxCount * 100)
                   return (
                     <div key={g._id}>
                       <div className="flex justify-between text-xs mb-1">
@@ -477,35 +484,28 @@ export default function AdminReports() {
                         <span style={{ color: 'var(--color-text-muted)' }}>{g.count} lượt</span>
                       </div>
                       <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
-                          transition={{ duration: 0.8, delay: i * 0.05 }}
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, delay: i * 0.05 }}
                           className="h-full rounded-full"
                           style={{ background: i === 0 ? 'var(--color-primary)' : 'rgba(168,85,247,0.45)' }} />
                       </div>
                     </div>
-                  );
+                  )
                 })}
               </div>
             </div>
-
-            {/* Peak Hours mini chart dùng recharts đã import sẵn */}
             <div>
-              <div className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text-muted)' }}>
-                Giờ cao điểm toàn hệ thống
-              </div>
+              <div className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text-muted)' }}>Giờ cao điểm toàn hệ thống</div>
               <ResponsiveContainer width="100%" height={100}>
                 <BarChart data={(trends.peakHours || []).filter((_: any, i: number) => i >= 8 && i <= 23)}
                   margin={{ top: 0, right: 0, left: 0, bottom: 0 }} barCategoryGap="20%">
                   <XAxis dataKey="hour" tick={{ fontSize: 10, fill: 'var(--color-text-dim)' }}
                     axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}h`} />
-                  <Tooltip
-                    contentStyle={{ background: 'var(--color-bg-2)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 8, fontSize: 11 }}
+                  <Tooltip contentStyle={{ background: 'var(--color-bg-2)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 8, fontSize: 11 }}
                     formatter={(v: number) => [`${v} booking`, 'Lượt đặt']} />
                   <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={20} fill="rgba(168,85,247,0.5)" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-
           </motion.div>
         )}
 
@@ -518,6 +518,7 @@ export default function AdminReports() {
             { href: '/admin/payments', label: '💰 Xác Nhận CK' },
             { href: '/staff/checkin', label: '📷 Check-in' },
             { href: '/staff/counter', label: '🎫 Bán Vé Quầy' },
+            { href: '/promotions', label: '🎁 Khuyến Mãi' },
             { href: '/admin', label: '🏠 Dashboard' },
           ].map(({ href, label }) => (
             <Link key={href} to={href}

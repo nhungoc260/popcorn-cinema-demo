@@ -422,6 +422,37 @@ const SupportTicketSchema = new Schema<ISupportTicket>({
   resolvedAt: Date,
 }, { timestamps: true })
 
+// ════════════════════════════════════════════════════════
+// PROMOTION MODEL (ưu đãi tĩnh - admin quản lý)
+// ════════════════════════════════════════════════════════
+export interface IPromotion extends Document {
+  title: string;
+  description: string;
+  tag: string;
+  imageUrl?: string;
+  gradient?: string;
+  color?: string;
+  conditions: string[];
+  target: string;
+  validFrom: string;
+  validTo: string;
+  isActive: boolean;
+}
+
+const PromotionSchema = new Schema<IPromotion>({
+  title:       { type: String, required: true },
+  description: { type: String, required: true },
+  tag:         { type: String, default: '' },
+  imageUrl:    { type: String, default: '' },
+  gradient:    { type: String, default: 'linear-gradient(135deg, #4C1D95, #7C3AED)' },
+  color:       { type: String, default: '#A855F7' },
+  conditions:  [String],
+  target:      { type: String, default: 'Tất cả khách hàng' },
+  validFrom:   { type: String, default: '' },
+  validTo:     { type: String, default: '' },
+  isActive:    { type: Boolean, default: true },
+}, { timestamps: true });
+
 // ── Exports ────────────────────────────────────────────────
 export const User     = mongoose.model<IUser>('User', UserSchema);
 export const Movie    = mongoose.model<IMovie>('Movie', MovieSchema);
@@ -437,3 +468,4 @@ export const Coupon   = mongoose.model<ICoupon>('Coupon', CouponSchema);
 export const Loyalty  = mongoose.model<ILoyalty>('Loyalty', LoyaltySchema);
 export const Ticket   = mongoose.model<ITicket>('Ticket', TicketSchema);
 export const SupportTicket = mongoose.model<ISupportTicket>('SupportTicket', SupportTicketSchema)
+export const Promotion = mongoose.model<IPromotion>('Promotion', PromotionSchema);

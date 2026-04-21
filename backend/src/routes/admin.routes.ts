@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { User, Movie, Booking, Payment, Showtime, Theater, Room, Loyalty } from '../models';
+import { User, Movie, Booking, Payment, Showtime, Theater, Room, Loyalty, Promotion } from '../models';
 import { authenticate, authorize } from '../middleware/errorHandler';
 import { getCoupons, createCoupon, deleteCoupon } from '../controllers/coupon.controller';
 
@@ -432,5 +432,55 @@ router.patch('/invoices/:id/status', async (req: any, res) => {
 router.get('/coupons', getCoupons);
 router.post('/coupons', createCoupon);
 router.delete('/coupons/:id', deleteCoupon);
+
+// ─── Promotions (ưu đãi tĩnh) ─────────────────────────────
+router.get('/promotions', async (_req, res) => {
+  try {
+    const promotions = await Promotion.find().sort({ createdAt: -1 }).lean();
+    res.json({ success: true, data: promotions });
+  } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+router.post('/promotions', async (req, res) => {
+  try {
+    const p = await Promotion.create(req.body);
+    res.status(201).json({ success: true, data: p });
+  } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+router.put('/promotions/:id', async (req, res) => {
+  try {
+    const p = await Promotion.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json({ success: true, data: p });
+  } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+router.delete('/promotions/:id', async (req, res) => {
+  try {
+    await Promotion.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Đã xóa ưu đãi' });
+  } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ─── Thống kê coupon ──────────────────────────────────────
+router.get('/coupon-stats', async (_req, res) => {
+  try {
+    const { Coupon } = await import('../models');
+    const coupons = await Coupon.find().lean() as any[];
+    const totalUsed = coupons.reduce((s: number, c: any) => s + (c.usedCount || 0), 0);
+    // Ước tính tổng tiền đã giảm (cần lưu thực tế nếu muốn chính xác)
+    const stats = coupons.map((c: any) => ({
+      code: c.code,
+      type: c.type,
+      value: c.value,
+      usedCount: c.usedCount,
+      usageLimit: c.usageLimit,
+      expiresAt: c.expiresAt,
+      isActive: c.isActive,
+      usedPct: c.usageLimit > 0 ? Math.round(c.usedCount / c.usageLimit * 100) : 0,
+    }));
+    res.json({ success: true, data: { stats, totalUsed, totalCoupons: coupons.length } });
+  } catch (e: any) { res.status(500).json({ success: false, message: e.message }); }
+});
 
 export default router;

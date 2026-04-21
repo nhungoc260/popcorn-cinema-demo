@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { CheckCircle, Clock, AlertCircle, RefreshCw, Coins } from 'lucide-react'
+import { CheckCircle, Clock, AlertCircle, RefreshCw, Coins, Tag, X } from 'lucide-react'
 import api, { bookingApi, paymentApi } from '../api'
 import BookingSteps from '../components/booking/BookingSteps'
 import toast from 'react-hot-toast'
@@ -39,6 +39,11 @@ export default function PaymentPage() {
   const [discount, setDiscount] = useState<any>(null)
   const [loadingDiscount, setLoadingDiscount] = useState(false)
 
+  // 🆕 Coupon states
+  const [couponCode, setCouponCode] = useState('')
+  const [couponResult, setCouponResult] = useState<any>(null)
+  const [loadingCoupon, setLoadingCoupon] = useState(false)
+
   const { data: bookingData } = useQuery({
     queryKey: ['booking', bookingId],
     queryFn: () => bookingApi.getOne(bookingId!),
@@ -54,7 +59,14 @@ export default function PaymentPage() {
   const booking = bookingData as any
   const loyalty = loyaltyData as any
   const currentMethod = METHODS.find(m => m.id === method)!
-  const finalAmount = discount ? discount.finalAmount : booking?.totalAmount
+
+  // 🆕 Tính finalAmount có tính cả coupon
+  const finalAmount = useMemo(() => {
+    let base = booking?.totalAmount ?? 0
+    if (discount) base = discount.finalAmount
+    if (couponResult) base = Math.max(0, base - couponResult.discountAmount)
+    return base
+  }, [booking?.totalAmount, discount, couponResult])
 
   // ✅ Tính số điểm tối đa có thể dùng (30% giá trị đơn)
   const maxPointsAllowed = useMemo(() => {
@@ -104,9 +116,34 @@ export default function PaymentPage() {
       setDiscount(null)
       setPointsToUse(0)
     } else {
-      // ✅ Tự điền sẵn số điểm tối đa có thể dùng
       setPointsToUse(maxPointsAllowed)
     }
+  }
+
+  // 🆕 Áp mã coupon
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim() || !bookingId) return
+    setLoadingCoupon(true)
+    try {
+      const res = await api.post('/coupons/apply', {
+        code: couponCode.trim().toUpperCase(),
+        bookingId,
+        orderAmount: booking?.totalAmount,
+      })
+      setCouponResult(res.data.data)
+      toast.success(`✅ Áp mã thành công! Giảm ${fmtPrice(res.data.data.discountAmount)}`)
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Mã không hợp lệ hoặc đã hết lượt')
+      setCouponResult(null)
+    } finally {
+      setLoadingCoupon(false)
+    }
+  }
+
+  // 🆕 Xóa mã coupon
+  const handleRemoveCoupon = () => {
+    setCouponResult(null)
+    setCouponCode('')
   }
 
   const { mutate: initiate, isPending: initiating } = useMutation({
@@ -216,8 +253,6 @@ export default function PaymentPage() {
                           {loadingDiscount ? '...' : 'Áp dụng'}
                         </button>
                       </div>
-
-                      {/* ✅ Thông báo rõ ràng số điểm tối đa */}
                       <div className="text-xs" style={{ color: 'var(--color-text-dim)' }}>
                         100 điểm = 10.000đ · Tối đa 30% giá trị đơn
                       </div>
@@ -253,11 +288,80 @@ export default function PaymentPage() {
                 </div>
               )}
 
-              <div className="flex justify-between pt-2 mt-2 border-t" style={{ borderColor: 'var(--color-glass-border)' }}>
+              {/* 🆕 COUPON SECTION */}
+              {step === 'choose' && (
+                <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--color-glass-border)' }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Tag className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
+                    <span className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Mã giảm giá</span>
+                  </div>
+
+                  {couponResult ? (
+                    // Đã áp mã thành công
+                    <div className="flex items-center justify-between p-3 rounded-xl"
+                      style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🎟️</span>
+                        <div>
+                          <div className="text-sm font-bold font-mono" style={{ color: '#34D399' }}>{couponResult.code}</div>
+                          <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                            Giảm {fmtPrice(couponResult.discountAmount)}
+                            {couponResult.type === 'percent' ? ` (${couponResult.value}%)` : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <button onClick={handleRemoveCoupon}
+                        className="p-1.5 rounded-lg transition-opacity hover:opacity-70"
+                        style={{ background: 'rgba(248,113,113,0.1)', color: '#F87171' }}>
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    // Chưa áp mã
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponCode}
+                        onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                        onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
+                        placeholder="Nhập mã coupon (VD: WELCOME20)"
+                        className="flex-1 px-3 py-2.5 rounded-xl text-sm font-mono tracking-widest outline-none"
+                        style={{
+                          background: 'var(--color-bg)',
+                          border: '1px solid var(--color-glass-border)',
+                          color: 'var(--color-text)',
+                        }}
+                      />
+                      <button
+                        onClick={handleApplyCoupon}
+                        disabled={loadingCoupon || !couponCode.trim()}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-50 whitespace-nowrap"
+                        style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))', color: 'white' }}>
+                        {loadingCoupon ? '...' : 'Áp dụng'}
+                      </button>
+                    </div>
+                  )}
+
+                  <p className="text-xs mt-1.5" style={{ color: 'var(--color-text-dim)' }}>
+                    Xem mã tại trang{' '}
+                    <a href="/promotions" target="_blank" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>
+                      Khuyến mãi
+                    </a>
+                  </p>
+                </div>
+              )}
+
+              {/* Tổng thanh toán */}
+              <div className="flex justify-between pt-3 mt-3 border-t" style={{ borderColor: 'var(--color-glass-border)' }}>
                 <span className="font-semibold" style={{ color: 'var(--color-text)' }}>Tổng thanh toán</span>
                 <div className="text-right">
-                  {discount && discount.finalAmount < booking.totalAmount && (
+                  {(discount || couponResult) && finalAmount < booking.totalAmount && (
                     <div className="text-xs line-through" style={{ color: 'var(--color-text-dim)' }}>{fmtPrice(booking.totalAmount)}</div>
+                  )}
+                  {couponResult && (
+                    <div className="text-xs mb-0.5" style={{ color: '#34D399' }}>
+                      -{fmtPrice(couponResult.discountAmount)} (mã {couponResult.code})
+                    </div>
                   )}
                   <span className="font-bold text-lg text-gradient-gold">{fmtPrice(finalAmount ?? booking.totalAmount)}</span>
                 </div>
@@ -317,7 +421,7 @@ export default function PaymentPage() {
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     className="flex-1 py-4 rounded-2xl font-bold text-sm disabled:opacity-60"
                     style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))', color: 'white', boxShadow: '0 4px 20px rgba(168,85,247,0.3)' }}>
-                    {initiating ? '⏳ Đang tạo...' : `🔐 Tiến Hành Thanh Toán ${finalAmount ? fmtPrice(finalAmount) : ''}`}
+                    {initiating ? '⏳ Đang tạo...' : `🔐 Tiến Hành Thanh Toán ${fmtPrice(finalAmount ?? booking?.totalAmount ?? 0)}`}
                   </motion.button>
                 </div>
               </motion.div>

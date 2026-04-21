@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const models_1 = require("../models");
@@ -443,5 +476,65 @@ router.patch('/invoices/:id/status', async (req, res) => {
 router.get('/coupons', coupon_controller_1.getCoupons);
 router.post('/coupons', coupon_controller_1.createCoupon);
 router.delete('/coupons/:id', coupon_controller_1.deleteCoupon);
+// ─── Promotions (ưu đãi tĩnh) ─────────────────────────────
+router.get('/promotions', async (_req, res) => {
+    try {
+        const promotions = await models_1.Promotion.find().sort({ createdAt: -1 }).lean();
+        res.json({ success: true, data: promotions });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+router.post('/promotions', async (req, res) => {
+    try {
+        const p = await models_1.Promotion.create(req.body);
+        res.status(201).json({ success: true, data: p });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+router.put('/promotions/:id', async (req, res) => {
+    try {
+        const p = await models_1.Promotion.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        res.json({ success: true, data: p });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+router.delete('/promotions/:id', async (req, res) => {
+    try {
+        await models_1.Promotion.findByIdAndDelete(req.params.id);
+        res.json({ success: true, message: 'Đã xóa ưu đãi' });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+// ─── Thống kê coupon ──────────────────────────────────────
+router.get('/coupon-stats', async (_req, res) => {
+    try {
+        const { Coupon } = await Promise.resolve().then(() => __importStar(require('../models')));
+        const coupons = await Coupon.find().lean();
+        const totalUsed = coupons.reduce((s, c) => s + (c.usedCount || 0), 0);
+        // Ước tính tổng tiền đã giảm (cần lưu thực tế nếu muốn chính xác)
+        const stats = coupons.map((c) => ({
+            code: c.code,
+            type: c.type,
+            value: c.value,
+            usedCount: c.usedCount,
+            usageLimit: c.usageLimit,
+            expiresAt: c.expiresAt,
+            isActive: c.isActive,
+            usedPct: c.usageLimit > 0 ? Math.round(c.usedCount / c.usageLimit * 100) : 0,
+        }));
+        res.json({ success: true, data: { stats, totalUsed, totalCoupons: coupons.length } });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
 exports.default = router;
 //# sourceMappingURL=admin.routes.js.map

@@ -35,14 +35,22 @@ async function validateCoupon(req, res) {
 // POST /coupons/apply
 async function applyCoupon(req, res) {
     try {
-        const { code } = req.body;
+        const { code, orderAmount } = req.body;
         const coupon = await models_1.Coupon.findOne({ code: code.toUpperCase(), isActive: true });
         if (!coupon)
             return res.status(404).json({ success: false, message: 'Mã không hợp lệ' });
-        coupon.usedCount += 1;
-        coupon.usedBy.push(req.user.id);
-        await coupon.save();
-        return res.json({ success: true, message: 'Áp dụng mã thành công' });
+        if (new Date() > coupon.expiresAt)
+            return res.status(400).json({ success: false, message: 'Mã đã hết hạn' });
+        if (coupon.usedCount >= coupon.usageLimit)
+            return res.status(400).json({ success: false, message: 'Mã đã hết lượt sử dụng' });
+        if (coupon.usedBy.map((id) => id.toString()).includes(req.user.id))
+            return res.status(400).json({ success: false, message: 'Bạn đã sử dụng mã này rồi' });
+        if (orderAmount < coupon.minOrder)
+            return res.status(400).json({ success: false, message: `Đơn tối thiểu ${coupon.minOrder.toLocaleString('vi')}đ` });
+        const discountAmount = coupon.type === 'percent'
+            ? Math.min(Math.round(orderAmount * coupon.value / 100), coupon.maxDiscount)
+            : Math.min(coupon.value, coupon.maxDiscount);
+        return res.json({ success: true, data: { code: coupon.code, type: coupon.type, value: coupon.value, discountAmount } });
     }
     catch (err) {
         return res.status(500).json({ success: false, message: err.message });

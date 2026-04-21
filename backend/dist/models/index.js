@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SupportTicket = exports.Ticket = exports.Loyalty = exports.Coupon = exports.Review = exports.OTP = exports.Payment = exports.Booking = exports.Showtime = exports.Seat = exports.Room = exports.Theater = exports.Movie = exports.User = void 0;
+exports.Promotion = exports.SupportTicket = exports.Ticket = exports.Loyalty = exports.Coupon = exports.Review = exports.OTP = exports.Payment = exports.Booking = exports.Showtime = exports.Seat = exports.Room = exports.Theater = exports.Movie = exports.User = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const UserSchema = new mongoose_1.Schema({
@@ -228,6 +228,19 @@ const SupportTicketSchema = new mongoose_1.Schema({
     note: { type: String, default: '' },
     resolvedAt: Date,
 }, { timestamps: true });
+const PromotionSchema = new mongoose_1.Schema({
+    title: { type: String, required: true },
+    description: { type: String, required: true },
+    tag: { type: String, default: '' },
+    imageUrl: { type: String, default: '' },
+    gradient: { type: String, default: 'linear-gradient(135deg, #4C1D95, #7C3AED)' },
+    color: { type: String, default: '#A855F7' },
+    conditions: [String],
+    target: { type: String, default: 'Tất cả khách hàng' },
+    validFrom: { type: String, default: '' },
+    validTo: { type: String, default: '' },
+    isActive: { type: Boolean, default: true },
+}, { timestamps: true });
 // ── Exports ────────────────────────────────────────────────
 exports.User = mongoose_1.default.model('User', UserSchema);
 exports.Movie = mongoose_1.default.model('Movie', MovieSchema);
@@ -243,4 +256,5 @@ exports.Coupon = mongoose_1.default.model('Coupon', CouponSchema);
 exports.Loyalty = mongoose_1.default.model('Loyalty', LoyaltySchema);
 exports.Ticket = mongoose_1.default.model('Ticket', TicketSchema);
 exports.SupportTicket = mongoose_1.default.model('SupportTicket', SupportTicketSchema);
+exports.Promotion = mongoose_1.default.model('Promotion', PromotionSchema);
 //# sourceMappingURL=index.js.map

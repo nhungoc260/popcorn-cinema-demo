@@ -185,6 +185,19 @@ export interface ISupportTicket extends Document {
     resolvedAt?: Date;
     createdAt: Date;
 }
+export interface IPromotion extends Document {
+    title: string;
+    description: string;
+    tag: string;
+    imageUrl?: string;
+    gradient?: string;
+    color?: string;
+    conditions: string[];
+    target: string;
+    validFrom: string;
+    validTo: string;
+    isActive: boolean;
+}
 export declare const User: mongoose.Model<IUser, {}, {}, {}, mongoose.Document<unknown, {}, IUser, {}, {}> & IUser & Required<{
     _id: mongoose.Types.ObjectId;
 }> & {
@@ -251,6 +264,11 @@ export declare const Ticket: mongoose.Model<ITicket, {}, {}, {}, mongoose.Docume
     __v: number;
 }, any>;
 export declare const SupportTicket: mongoose.Model<ISupportTicket, {}, {}, {}, mongoose.Document<unknown, {}, ISupportTicket, {}, {}> & ISupportTicket & Required<{
+    _id: mongoose.Types.ObjectId;
+}> & {
+    __v: number;
+}, any>;
+export declare const Promotion: mongoose.Model<IPromotion, {}, {}, {}, mongoose.Document<unknown, {}, IPromotion, {}, {}> & IPromotion & Required<{
     _id: mongoose.Types.ObjectId;
 }> & {
     __v: number;

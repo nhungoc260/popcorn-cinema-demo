@@ -198,6 +198,7 @@ export interface IPromotion extends Document {
     target: string;
     validFrom: string;
     validTo: string;
+    couponCode?: string;
     isActive: boolean;
 }
 export declare const User: mongoose.Model<IUser, {}, {}, {}, mongoose.Document<unknown, {}, IUser, {}, {}> & IUser & Required<{

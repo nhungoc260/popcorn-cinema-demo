@@ -21,6 +21,7 @@ const EMPTY_PROMO_FORM = {
   gradient: GRADIENT_OPTIONS[0].value, color: GRADIENT_OPTIONS[0].color,
   conditions: [''], target: 'Tất cả khách hàng',
   validFrom: '', validTo: '', isActive: true,
+  couponCode: '',
 }
 
 const EMPTY_COUPON_FORM = {
@@ -336,6 +337,23 @@ export default function PromotionsPage() {
                     </ul>
                   </div>
                 )}
+                {selectedPromo.couponCode && (
+                  <div className="mb-4 p-3 rounded-xl flex items-center justify-between"
+                    style={{ background: 'rgba(168,85,247,0.08)', border: '2px dashed rgba(168,85,247,0.4)' }}>
+                    <div>
+                      <div className="text-xs mb-0.5" style={{ color: 'var(--color-text-muted)' }}>🎟 Mã giảm giá</div>
+                      <div className="font-black font-mono text-lg" style={{ color: 'var(--color-primary)' }}>
+                        {selectedPromo.couponCode}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(selectedPromo.couponCode); toast.success('Đã copy mã!') }}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold"
+                      style={{ background: 'rgba(168,85,247,0.15)', color: 'var(--color-primary)', border: '1px solid rgba(168,85,247,0.3)' }}>
+                      <Copy className="w-3.5 h-3.5" /> Copy mã
+                    </button>
+                  </div>
+                )}
                 <div className="flex gap-3">
                   <button onClick={() => setSelectedPromo(null)}
                     className="flex-1 py-3 rounded-xl text-sm font-medium"
@@ -374,6 +392,13 @@ export default function PromotionsPage() {
                   <label className="block text-xs mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Mô tả *</label>
                   <textarea value={promoForm.description} onChange={setPField('description')} rows={2} placeholder="VD: Giảm 20%..." className={inputClass} style={inputStyle} />
                 </div>
+                <div>
+                <label className="block text-xs mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                  🎟 Mã coupon áp dụng (nếu có)
+                </label>
+                <input value={promoForm.couponCode} onChange={setPField('couponCode')}
+                  placeholder="VD: STUDENT20" className={inputClass} style={inputStyle} />
+              </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Tag hiển thị</label>

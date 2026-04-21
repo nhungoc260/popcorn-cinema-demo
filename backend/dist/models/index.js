@@ -241,6 +241,7 @@ const PromotionSchema = new mongoose_1.Schema({
     target: { type: String, default: 'Tất cả khách hàng' },
     validFrom: { type: String, default: '' },
     validTo: { type: String, default: '' },
+    couponCode: { type: String, default: '' },
     isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 // ── Exports ────────────────────────────────────────────────

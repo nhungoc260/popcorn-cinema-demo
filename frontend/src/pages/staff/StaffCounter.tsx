@@ -1661,6 +1661,7 @@ function StaffPromotionsTab({ onUseCoupon }: { onUseCoupon?: (code: string) => v
     })
 
   const fmtCouponDiscount = (c: any) => {
+    if (!c.discountValue) return 'Popcorn'
     if (c.discountType === 'percent') return `-${c.discountValue}%`
     if (c.discountType === 'fixed') return `-${c.discountValue?.toLocaleString('vi-VN')}đ`
     return `${c.discountValue}`

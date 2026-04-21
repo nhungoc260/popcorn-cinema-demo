@@ -67,6 +67,7 @@ export default function Navbar() {
     { href: '/movies',    label: 'Phim' },
     { href: '/theaters',  label: 'Rạp Chiếu' },
     { href: '/showtimes', label: 'Suất Chiếu' },
+    { href: '/promotions',  label: '🎁 Khuyến mãi' },
   ]
 
   const NOTI_ICONS: Record<string, string> = {

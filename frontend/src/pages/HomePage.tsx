@@ -7,6 +7,19 @@ import { movieApi } from '../api'
 import MovieCard from '../components/movie/MovieCard'
 import { MovieCardSkeleton } from '../components/ui/Skeletons'
 
+function getYouTubeId(url: string): string {
+  if (!url) return ''
+  const patterns = [
+    /youtu\.be\/([^?&]+)/,
+    /youtube\.com\/watch\?v=([^?&]+)/,
+    /youtube\.com\/embed\/([^?&]+)/,
+  ]
+  for (const p of patterns) {
+    const m = url.match(p)
+    if (m) return m[1]
+  }
+  return ''
+}
 export default function HomePage() {
   const navigate = useNavigate()
   const [heroIdx, setHeroIdx] = useState(0)
@@ -49,17 +62,37 @@ export default function HomePage() {
       ════════════════════════════════════════════════ */}
       <section className="relative overflow-hidden" style={{ minHeight: '100vh' }}>
 
-        {/* Background poster */}
+        {/* Background: YouTube trailer nếu có, fallback poster */}
         <AnimatePresence mode="sync">
           {hero && (
             <motion.div key={`bg-${heroIdx}`}
-              initial={{ opacity: 0, scale: 1.06 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 1.2 }}
-              className="absolute inset-0"
-              style={{ backgroundImage: `url(${hero.poster})`, backgroundSize: 'cover', backgroundPosition: 'center top', filter: 'blur(3px)' }}
-            />
+              className="absolute inset-0 overflow-hidden">
+              {hero.trailerUrl ? (
+                <iframe
+                  key={`yt-${heroIdx}`}
+                  src={`https://www.youtube.com/embed/${getYouTubeId(hero.trailerUrl)}?autoplay=1&mute=1&loop=1&playlist=${getYouTubeId(hero.trailerUrl)}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1`}
+                  allow="autoplay; encrypted-media"
+                  className="absolute"
+                  style={{
+                    top: '50%', left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: '177.78vh',   // 16:9 giữ tỉ lệ
+                    minWidth: '100%',
+                    height: '56.25vw',
+                    minHeight: '100%',
+                    border: 'none',
+                    pointerEvents: 'none',
+                  }}
+                />
+              ) : (
+                <div className="absolute inset-0"
+                  style={{ backgroundImage: `url(${hero.poster})`, backgroundSize: 'cover', backgroundPosition: 'center top', filter: 'blur(3px)' }} />
+              )}
+            </motion.div>
           )}
         </AnimatePresence>
 

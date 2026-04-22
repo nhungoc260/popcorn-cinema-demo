@@ -2,7 +2,13 @@
 
 > **Cinema booking system** với UI Dark Cinematic, Realtime seat locking bằng Redis + Socket.io, tích hợp thanh toán Việt Nam, và hệ thống quản lý rạp chiếu phim đầy đủ.
 
+🌐 **Live Demo:** [https://popcorn-cinema-demo.onrender.com](https://popcorn-cinema-demo.onrender.com)
+
+> ⚠️ **Lưu ý:** Hệ thống deploy trên Render Free tier — có thể mất ~50 giây để khởi động lại sau khi không hoạt động.
+> 🔔 **UptimeRobot** được cấu hình để ping server định kỳ, giảm thiểu tình trạng cold start.
+
 ---
+
 
 ## 🗂 Cấu Trúc Dự Án
 
@@ -11,13 +17,15 @@ popcorn-cinema/
 ├── backend/                 # Node.js + Express + TypeScript
 │   ├── src/
 │   │   ├── config/          # database.ts, redis.ts
-│   │   ├── controllers/     # auth, booking, coupon, movie, payment, report, review, showtime
+│   │   ├── controllers/     # auth, booking, coupon, membership, movie, payment,
+│   │   │                    # report, review, showtime, support, ai
 │   │   ├── middleware/      # errorHandler.ts
 │   │   ├── models/          # index.ts (Mongoose schemas)
-│   │   ├── routes/          # admin, auth, booking, coupon, movie, payment, report, review, seat, showtime, theater, user
+│   │   ├── routes/          # admin, ai, auth, booking, coupon, membership, movie,
+│   │   │                    # payment, report, review, seat, showtime, support,
+│   │   │                    # theater, user
 │   │   ├── socket/          # socketServer.ts
 │   │   └── utils/           # emailService.ts, smsService.ts, seed.ts
-│   ├── .env
 │   ├── .env.example
 │   ├── package.json
 │   └── tsconfig.json
@@ -28,20 +36,24 @@ popcorn-cinema/
 │   │   ├── components/
 │   │   │   ├── 3d/          # HeroScene.tsx, TiltCard.tsx
 │   │   │   ├── admin/       # AdminLayout.tsx, UserDetailModal.tsx
-│   │   │   ├── booking/     # BookingSteps.tsx, CouponInput.tsx, QuickBooking.tsx, SeatGrid.tsx
+│   │   │   ├── booking/     # BookingSteps.tsx, CouponInput.tsx,
+│   │   │   │                # QuickBooking.tsx, SeatGrid.tsx
 │   │   │   ├── layout/      # Footer.tsx, Layout.tsx, Navbar.tsx
 │   │   │   ├── movie/       # MovieCard.tsx, ReviewSection.tsx
-│   │   │   └── ui/          # Logo.tsx, Skeletons.tsx, SocketNotificationBridge.tsx, TierUpgradeModal.tsx
-│   │   ├── hooks/           # useNotifications.ts, useSocket.ts
+│   │   │   └── ui/          # AIChatWidget.tsx, Logo.tsx, Skeletons.tsx,
+│   │   │                    # SocketNotificationBridge.tsx, TierUpgradeModal.tsx
+│   │   ├── hooks/           # useGroupBooking.ts, useNotifications.ts, useSocket.ts
 │   │   ├── pages/
-│   │   │   ├── admin/       # AdminDashboard, AdminMovies, AdminPayments, AdminReports,
-│   │   │   │                # AdminRooms, AdminSeatDesigner, AdminShowtimes, AdminSmartSchedule,
-│   │   │   │                # AdminTheaters, AdminUsers
+│   │   │   ├── admin/       # AdminDashboard, AdminInvoices, AdminMovies,
+│   │   │   │                # AdminPayments, AdminReports, AdminRooms,
+│   │   │   │                # AdminSeatDesigner, AdminShowtimes,
+│   │   │   │                # AdminSmartSchedule, AdminTheaters, AdminUsers
 │   │   │   ├── staff/       # StaffCheckIn.tsx, StaffCounter.tsx
-│   │   │   └── *.tsx        # BookingPage, BookingSuccessPage, ForgotPasswordPage, HomePage,
-│   │   │                    # InvoicePage, LoginPage, MovieDetailPage, MoviesPage,
-│   │   │                    # MyBookingsPage, NotFoundPage, PaymentPage, ProfilePage,
-│   │   │                    # RegisterPage, SeatSelectionPage, ShowtimesPage, TheatersPage
+│   │   │   └── *.tsx        # BookingPage, BookingSuccessPage, ForgotPasswordPage,
+│   │   │                    # HomePage, InvoicePage, LoginPage, MovieDetailPage,
+│   │   │                    # MoviesPage, MyBookingsPage, NotFoundPage, PaymentPage,
+│   │   │                    # ProfilePage, PromotionsPage, RegisterPage,
+│   │   │                    # SeatSelectionPage, ShowtimesPage, TheatersPage
 │   │   ├── store/           # authStore.ts, themeStore.ts
 │   │   ├── types/           # global.d.ts
 │   │   └── utils/           # toast.ts
@@ -145,6 +157,7 @@ npm run dev             # Chạy frontend tại port 5173
 - **Check-in** – Quản lý check-in
 - **Bán vé quầy** – Bán vé tại rạp
 - **Người dùng** – Quản lý tài khoản
+- **Báo cáo** – Doanh thu, top phim, xu hướng hành vi người dùng, thống kê mã giảm giá
 
 ### 🧑‍💼 Nhân viên (`/staff`)
 - **Quầy Vé** – Chọn phim, suất chiếu, bán vé tại quầy theo ngày
@@ -159,6 +172,9 @@ npm run dev             # Chạy frontend tại port 5173
 - Thanh toán (MoMo / VietQR / Chuyển khoản)
 - Xem vé QR, lịch sử đặt vé
 - Đánh giá phim, quản lý hồ sơ
+- **Hệ thống membership** – Tích điểm, hạng thành viên (Kim Cương, v.v.)
+- **Phân tích cá nhân** – Thể loại yêu thích, phong cách xem phim
+- **Khuyến mãi** – Xem ưu đãi & mã giảm giá
 
 ---
 
@@ -228,6 +244,8 @@ npm run dev             # Chạy frontend tại port 5173
 | GET | /api/v1/reports | Báo cáo (admin) |
 | GET/POST | /api/v1/seats | Quản lý ghế |
 | GET | /api/v1/users | Quản lý user (admin) |
+| GET/POST | /api/v1/membership | Hệ thống thành viên |
+| POST | /api/v1/ai | AI Chat hỗ trợ |
 
 ---
 
@@ -287,6 +305,9 @@ Hết 5 phút không thanh toán:
 | Auth | JWT (Access Token + Refresh Token) + OTP |
 | Email / SMS | emailService + smsService |
 | Payment | MoMo / VietQR / Chuyển khoản (Mock) |
+| AI | Groq SDK (AI Chat Widget) |
+| Deploy | Render (Backend) + Vercel (Frontend) |
+| Monitoring | UptimeRobot (keep-alive ping) |
 
 ---
 
@@ -332,4 +353,4 @@ cd frontend && npm run build
 
 ---
 
-*Được xây dựng với Nguyễn Trần Như Ngọc🐨 – 2026*
+*Được xây dựng với ❤️ bởi Nguyễn Trần Như Ngọc 🐨 – 2026*

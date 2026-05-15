@@ -50,10 +50,12 @@ export default function AdminSmartSchedule() {
     return map
   }, [movies])
 
-  const goldenSlots = selectedSlots.filter(s => { const h = +s.split(':')[0]; return h >= 14 && h <= 21 })
   const conflictRiskLevel: 'high' | 'medium' | 'low' =
-    movieIds.length > 1 && roomId !== '' ? 'high' :
-    movieIds.length > 1 && goldenSlots.length >= Math.ceil(selectedSlots.length * 0.7) ? 'medium' : 'low'
+  movieIds.length > 1 && roomId !== ''
+    ? 'high'
+    : movieIds.length > 1
+    ? 'medium'
+    : 'low'
 
   const loadRooms = async (tid: string) => {
     setTheaterId(tid); setRoomId('')

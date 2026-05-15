@@ -287,12 +287,30 @@ router.post('/showtimes/auto-generate', async (req, res) => {
 
     const start = new Date(startDate);
     const end   = new Date(endDate);
-    const sessionSlots: Array<{ roomId: string; startTime: Date; endTime: Date }> = [];
-    const generatedByMovie: Record<string, number> = {};
-    ids.forEach(id => { generatedByMovie[id] = 0; });
+    const endOfRange = new Date(end); endOfRange.setDate(endOfRange.getDate() + 1)
+    const existingShowtimes = await Showtime.find({
+      theater: theaterId,
+      isActive: true,
+      startTime: { $lt: endOfRange },
+      endTime:   { $gt: start },
+    }).select('room startTime endTime').lean() as any[]
+
+    const bookedSlots: Array<{ roomId: string; startTime: Date; endTime: Date }> = 
+      existingShowtimes.map(s => ({
+        roomId: s.room.toString(),
+        startTime: new Date(s.startTime),
+        endTime: new Date(s.endTime),
+      }))
+
+    function isConflict(roomId: string, s: Date, e: Date): boolean {
+      return bookedSlots.some(b => b.roomId === roomId && s < b.endTime && e > b.startTime)
+    }
+
+    const generatedByMovie: Record<string, number> = {}
+    ids.forEach(id => { generatedByMovie[id] = 0 })
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const weekday = d.getDay();
+      const weekday = d.getDay()
       const rawSlots = getSlotsForDay(weekday)
       const scoredSlots = rawSlots
         .map(s => {
@@ -303,41 +321,32 @@ router.post('/showtimes/auto-generate', async (req, res) => {
 
       const movieQueue = [...movies].sort(
         (a, b) => (generatedByMovie[a._id.toString()] || 0) - (generatedByMovie[b._id.toString()] || 0)
-      );
+      )
 
       for (let slotIdx = 0; slotIdx < scoredSlots.length; slotIdx++) {
-        const movie    = movieQueue[slotIdx % movieQueue.length];
-        const duration = movie.duration || 120;
-        const mId      = movie._id.toString();
+        const movie    = movieQueue[slotIdx % movieQueue.length]
+        const duration = movie.duration || 120
+        const mId      = movie._id.toString()
 
         const { hours, minutes } = scoredSlots[slotIdx]
         const startTime = new Date(d)
         startTime.setHours(hours, minutes, 0, 0)
-        const endTime = new Date(startTime.getTime() + (duration + 15) * 60000);
+        const endTime = new Date(startTime.getTime() + (duration + 15) * 60000)
 
         for (const room of rooms) {
-          const dbConflict = await Showtime.findOne({
-            room: room._id, isActive: true,
-            startTime: { $lt: endTime }, endTime: { $gt: startTime },
-          });
-          if (dbConflict) continue;
-
-          const sessionConflict = sessionSlots.some(slot =>
-            slot.roomId === room._id.toString() &&
-            hasOverlap(startTime, endTime, slot.startTime, slot.endTime)
-          );
-          if (sessionConflict) continue;
+          const roomId = room._id.toString()
+          if (isConflict(roomId, startTime, endTime)) continue
 
           await Showtime.create({
             movie: mId, room: room._id, theater: theaterId,
             startTime, endTime,
             priceStandard, priceVip, priceDouble, priceRecliner,
             basePrice: priceStandard, isActive: true,
-          });
+          })
 
-          sessionSlots.push({ roomId: room._id.toString(), startTime, endTime });
-          generatedByMovie[mId]++;
-          break;
+          bookedSlots.push({ roomId, startTime, endTime })
+          generatedByMovie[mId]++
+          break
         }
       }
     }

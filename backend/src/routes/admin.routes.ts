@@ -227,12 +227,29 @@ router.post('/showtimes/auto-generate', async (req, res) => {
       priceStandard = 85000, priceVip = 130000,
       priceDouble = 200000, priceRecliner = 150000,
       timeSlots,
-    } = req.body;
+      weekdaySlots,
+      weekendSlots,
+      blockbusterSlots,
+    } = req.body
 
     const ids: string[] = movieIds?.length ? movieIds : movieId ? [movieId] : [];
     if (!ids.length) return res.status(400).json({ success: false, message: 'Cần ít nhất 1 phim' });
 
-    const TIME_SLOTS_TO_USE: number[] = (timeSlots && timeSlots.length > 0) ? timeSlots : [8, 10, 13.5, 15, 17.5, 19.5, 21];
+    function parseSlot(s: string | number): { hours: number; minutes: number } {
+      if (typeof s === 'number') return { hours: Math.floor(s), minutes: Math.round((s % 1) * 60) }
+      const [h, m] = s.split(':').map(Number)
+      return { hours: h || 0, minutes: m || 0 }
+    }
+
+    const DEFAULT_WEEKDAY = ['08:00','10:30','13:00','15:30','18:00','20:30']
+    const DEFAULT_WEEKEND = ['07:30','09:30','11:30','13:30','15:30','17:30','19:30','21:30']
+
+    function getSlotsForDay(dayOfWeek: number): string[] {
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+      if (blockbusterSlots?.length) return blockbusterSlots
+      if (isWeekend) return weekendSlots?.length ? weekendSlots : DEFAULT_WEEKEND
+      return weekdaySlots?.length ? weekdaySlots : DEFAULT_WEEKDAY
+    }
 
     const movies = await Movie.find({ _id: { $in: ids } }).lean() as any[];
     if (!movies.length) return res.status(404).json({ success: false, message: 'Không tìm thấy phim' });
@@ -276,22 +293,26 @@ router.post('/showtimes/auto-generate', async (req, res) => {
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const weekday = d.getDay();
-      const scoredSlots = TIME_SLOTS_TO_USE
-        .map(h => ({ hour: h, score: scoreSlot(h, weekday, movies[0]) }))
-        .sort((a, b) => b.score - a.score);
+      const rawSlots = getSlotsForDay(weekday)
+      const scoredSlots = rawSlots
+        .map(s => {
+          const { hours, minutes } = parseSlot(s)
+          return { hours, minutes, score: scoreSlot(hours, weekday, movies[0]) }
+        })
+        .sort((a, b) => b.score - a.score)
 
       const movieQueue = [...movies].sort(
         (a, b) => (generatedByMovie[a._id.toString()] || 0) - (generatedByMovie[b._id.toString()] || 0)
       );
 
       for (let slotIdx = 0; slotIdx < scoredSlots.length; slotIdx++) {
-        const { hour } = scoredSlots[slotIdx];
         const movie    = movieQueue[slotIdx % movieQueue.length];
         const duration = movie.duration || 120;
         const mId      = movie._id.toString();
 
-        const startTime = new Date(d);
-        startTime.setHours(Math.floor(hour), Math.round((hour % 1) * 60), 0, 0);
+        const { hours, minutes } = scoredSlots[slotIdx]
+        const startTime = new Date(d)
+        startTime.setHours(hours, minutes, 0, 0)
         const endTime = new Date(startTime.getTime() + (duration + 15) * 60000);
 
         for (const room of rooms) {

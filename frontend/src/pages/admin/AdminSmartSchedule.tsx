@@ -26,7 +26,12 @@ export default function AdminSmartSchedule() {
   const [priceRecliner, setPriceRecliner] = useState(150000)
   const [result, setResult] = useState<any>(null)
   const [filterStatus, setFilterStatus] = useState('')
-  const [selectedSlots, setSelectedSlots] = useState<string[]>(['08:00','10:00','13:30','15:00','17:30','19:30','21:00'])
+  const [weekdaySlots, setWeekdaySlots] = useState<string[]>(['08:00','10:30','13:00','15:30','18:00','20:30'])
+  const [weekendSlots, setWeekendSlots] = useState<string[]>(['07:30','09:30','11:30','13:30','15:30','17:30','19:30','21:30'])
+  const [blockbusterSlots, setBlockbusterSlots] = useState<string[]>([])
+  const [activeSlotMode, setActiveSlotMode] = useState<'weekday'|'weekend'|'blockbuster'>('weekday')
+  const selectedSlots = activeSlotMode === 'weekday' ? weekdaySlots : activeSlotMode === 'weekend' ? weekendSlots : blockbusterSlots
+  const setSelectedSlots = activeSlotMode === 'weekday' ? setWeekdaySlots : activeSlotMode === 'weekend' ? setWeekendSlots : setBlockbusterSlots
   const [newSlot, setNewSlot] = useState('')
   const [previewWeekOffset, setPreviewWeekOffset] = useState(0)
   const [previewMode, setPreviewMode] = useState<'weekly' | 'timeline'>('weekly')
@@ -66,7 +71,9 @@ export default function AdminSmartSchedule() {
         roomId: roomId || undefined,
         startDate, endDate,
         priceStandard, priceVip, priceDouble, priceRecliner,
-        timeSlots: selectedSlots.map(s => { const [h, m] = s.split(':'); return +h + (+m) / 60 }),
+        weekdaySlots,
+        weekendSlots,
+        blockbusterSlots: blockbusterSlots.length > 0 ? blockbusterSlots : undefined,
       })
       return data
     },
@@ -517,31 +524,38 @@ export default function AdminSmartSchedule() {
 
                   {/* Time slots — quick presets */}
                   <div>
-                    <div className="grid grid-cols-3 gap-1.5 mb-2">
+                  <div className="grid grid-cols-3 gap-1.5 mb-2">
                       {([
-                        { label: 'Ngày thường', slots: ['08:00','10:30','13:00','15:30','18:00','20:30'], color: '#60A5FA' },
-                        { label: 'Cuối tuần', slots: ['07:30','09:30','11:30','13:30','15:30','17:30','19:30','21:30','23:00'], color: '#A855F7' },
-                        { label: 'Bom tấn', slots: ['07:00','09:00','11:00','13:00','15:00','17:00','19:00','21:00','22:30','00:00'], color: '#FDE68A' },
-                      ] as const).map(({ label, slots, color }) => {
-                        const isActive = selectedSlots.length === slots.length && slots.every(s => selectedSlots.includes(s))
-                        return (
-                          <button key={label} onClick={() => setSelectedSlots([...slots])}
-                            className="py-1.5 px-2 rounded-xl text-xs font-medium text-center"
-                            style={{
-                              background: isActive ? `${color}18` : 'var(--color-bg-3)',
-                              border: `1px solid ${isActive ? color : 'var(--color-glass-border)'}`,
-                              color: isActive ? color : 'var(--color-text-muted)',
-                            }}>
-                            {label}
-                            <div className="text-xs mt-0.5" style={{ color: isActive ? color : 'var(--color-text-dim)', fontSize: 10 }}>{slots.length} suất</div>
-                          </button>
-                        )
-                      })}
+                        { key: 'weekday'     as const, label: 'Ngày thường', sub: 'T2–T6', color: '#60A5FA',
+                          default: ['08:00','10:30','13:00','15:30','18:00','20:30'] },
+                        { key: 'weekend'     as const, label: 'Cuối tuần',   sub: 'T7–CN', color: '#A855F7',
+                          default: ['07:30','09:30','11:30','13:30','15:30','17:30','19:30','21:30'] },
+                        { key: 'blockbuster' as const, label: 'Bom tấn',     sub: 'Cả tuần', color: '#FDE68A',
+                          default: ['07:00','09:00','11:00','13:00','15:00','17:00','19:00','21:00','22:30'] },
+                      ]).map(({ key, label, sub, color, default: def }) => (
+                        <button key={key}
+                          onClick={() => {
+                            setActiveSlotMode(key)
+                            if (key === 'blockbuster' && blockbusterSlots.length === 0) setBlockbusterSlots(def)
+                          }}
+                          className="py-1.5 px-2 rounded-xl text-xs font-medium text-center"
+                          style={{
+                            background: activeSlotMode === key ? `${color}18` : 'var(--color-bg-3)',
+                            border: `1px solid ${activeSlotMode === key ? color : 'var(--color-glass-border)'}`,
+                            color: activeSlotMode === key ? color : 'var(--color-text-muted)',
+                          }}>
+                          {label}
+                          <div className="text-xs mt-0.5" style={{ color: activeSlotMode === key ? color : 'var(--color-text-dim)', fontSize: 10 }}>
+                            {sub} · {(key === 'weekday' ? weekdaySlots : key === 'weekend' ? weekendSlots : blockbusterSlots).length} giờ
+                          </div>
+                        </button>
+                      ))}
                     </div>
 
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
-                        Khung giờ <span style={{ color: 'var(--color-primary)' }}>({selectedSlots.length})</span>
+                        {activeSlotMode === 'weekday' ? 'Giờ ngày thường' : activeSlotMode === 'weekend' ? 'Giờ cuối tuần' : 'Giờ bom tấn'}{' '}
+                        <span style={{ color: 'var(--color-primary)' }}>({selectedSlots.length})</span>
                       </label>
                       <button onClick={() => setSelectedSlots([])}
                         className="text-xs px-2 py-0.5 rounded-lg"

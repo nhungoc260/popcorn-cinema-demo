@@ -29,7 +29,7 @@ const ADMIN_NAV = [
   {
     label: 'Vận hành',
     items: [
-      { href: '/admin/payments', label: '📋 Lịch Sử CK', icon: CreditCard },
+      { href: '/admin/payments', label: 'Lịch Sử CK', icon: CreditCard },
       { href: '/staff/checkin',  label: 'Check-in',    icon: QrCode },
       { href: '/staff/counter',  label: 'Bán vé quầy', icon: ShoppingCart },
     ]

@@ -1334,6 +1334,15 @@ export default function StaffCounter() {
             style={{ background: 'var(--color-bg-2)', border: '1px solid rgba(248,113,113,0.3)' }}>
             <h3 className="font-bold text-base mb-1" style={{ color: 'var(--color-text)' }}>Hủy vé gian lận</h3>
             <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>{cancelModal.transactionId}</p>
+            {cancelModal?.status === 'customer_confirmed' && (
+              <div className="p-2.5 rounded-xl mb-2 flex gap-2"
+                style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)' }}>
+                <span className="flex-shrink-0 text-xs">⚠️</span>
+                <p className="text-xs font-semibold" style={{ color: '#fbbf24' }}>
+                  Khách đã xác nhận CK! Kiểm tra ngân hàng trước khi hủy.
+                </p>
+              </div>
+            )}
             <div className="flex gap-1.5 flex-wrap mb-2">
               {['Không tìm thấy GD', 'Sai nội dung CK', 'Số tiền không khớp', 'Gian lận'].map(r => (
                 <button key={r} onClick={() => setCancelReason(r)}

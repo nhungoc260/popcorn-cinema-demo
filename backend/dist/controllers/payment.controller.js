@@ -210,7 +210,6 @@ async function getPendingPayments(req, res) {
             return res.status(403).json({ success: false, message: 'Forbidden' });
         }
         const payments = await models_1.Payment.find({
-            status: { $in: ['pending_confirmation', 'customer_confirmed'] },
             method: { $in: ['bank', 'vietqr', 'momo'] },
         })
             .populate({
@@ -228,6 +227,8 @@ async function getPendingPayments(req, res) {
         })
             .populate('user', 'name email phone')
             .sort({ createdAt: -1 })
+            .sort({ createdAt: -1 })
+            .limit(100)
             .lean();
         return res.json({ success: true, data: payments });
     }

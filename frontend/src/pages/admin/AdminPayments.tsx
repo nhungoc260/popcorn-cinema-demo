@@ -282,6 +282,17 @@ export default function AdminPayments() {
               </div>
             </div>
 
+            {/* Warning nếu khách đã xác nhận chuyển */}
+            {cancelModal?.status === 'customer_confirmed' && (
+              <div className="p-3 rounded-xl mb-4 flex gap-2"
+                style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)' }}>
+                <span className="flex-shrink-0">⚠️</span>
+                <p className="text-xs font-semibold" style={{ color: '#fbbf24' }}>
+                  Khách đã xác nhận chuyển tiền! Chỉ hủy nếu đã kiểm tra ngân hàng và xác nhận <b>chưa nhận được tiền</b>.
+                </p>
+              </div>
+            )}
+
             {/* Ticket summary in modal */}
             {(cancelModal.booking?.seatLabels?.length || cancelModal.booking?.showtime) && (
               <div className="p-3 rounded-xl mb-4 text-xs space-y-1"
@@ -296,6 +307,16 @@ export default function AdminPayments() {
                   <p><span style={{ color: 'var(--color-text-muted)' }}>Rạp: </span>
                     <b style={{ color: 'var(--color-text)' }}>{cancelModal.booking.showtime.room.theater.name}</b></p>
                 )}
+              </div>
+            )}
+
+            {cancelModal?.status === 'customer_confirmed' && (
+              <div className="p-3 rounded-xl mb-4 flex gap-2"
+                style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)' }}>
+                <span className="flex-shrink-0">⚠️</span>
+                <p className="text-xs font-semibold" style={{ color: '#fbbf24' }}>
+                  Khách đã xác nhận chuyển tiền! Chỉ hủy nếu đã kiểm tra ngân hàng và xác nhận <b>chưa nhận được tiền</b>.
+                </p>
               </div>
             )}
 

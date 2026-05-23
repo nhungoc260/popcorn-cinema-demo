@@ -51,7 +51,7 @@ const STAFF_NAV = [
     items: [
       { href: '/staff/counter',  label: 'Bán vé quầy', icon: ShoppingCart },
       { href: '/staff/checkin',  label: 'Check-in QR', icon: QrCode },
-      { href: '/admin/payments', label: '📋 Lịch Sử CK', icon: CreditCard },
+      { href: '/admin/payments', label: 'Lịch Sử CK', icon: CreditCard },
     ]
   },
   {

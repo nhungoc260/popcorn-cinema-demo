@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle, Banknote, CreditCard, Clock, RefreshCw, AlertCircle, Calendar, ChevronRight, BarChart3, TrendingUp, Search, FileText } from 'lucide-react'
+import { CheckCircle, Banknote, CreditCard, Clock, RefreshCw, AlertCircle, Calendar, ChevronRight, BarChart3, TrendingUp, Search, FileText, X, MapPin, Armchair} from 'lucide-react'
 import api, { showtimeApi, bookingApi, paymentApi, adminApi } from '../../api'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../../store/authStore'
@@ -255,6 +255,18 @@ export default function StaffCounter() {
 
   const [cancelModal, setCancelModal]   = useState<any | null>(null)
   const [cancelReason, setCancelReason] = useState('')
+  // Confirm tab search
+  const [confirmSearch, setConfirmSearch] = useState('')
+  const filteredPending = useMemo(() => {
+    const q = confirmSearch.trim().toLowerCase()
+    if (!q) return pending
+    return pending.filter((p: any) =>
+      p.user?.name?.toLowerCase().includes(q) ||
+      p.transactionId?.toLowerCase().includes(q) ||
+      p.booking?.showtime?.movie?.title?.toLowerCase().includes(q) ||
+      p.booking?.bookingCode?.toLowerCase().includes(q)
+    )
+  }, [pending, confirmSearch])
   const { mutate: cancelFraud, isPending: cancelling } = useMutation({
     mutationFn: ({ paymentId, reason }: { paymentId: string; reason: string }) =>
       api.post('/payments/admin-reject', { paymentId, reason }),
@@ -1075,7 +1087,7 @@ export default function StaffCounter() {
       )}
 
       {/* ════════════════════════════════
-          TAB: XÁC NHẬN CK
+          TAB: LỊCH SỬ CK
       ════════════════════════════════ */}
       {tab === 'confirm' && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -1095,48 +1107,117 @@ export default function StaffCounter() {
             </button>
           </div>
 
-          {pending.length === 0 ? (
+          {/* ── Search ── */}
+          {pending.length > 0 && (
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5"
+                style={{ color: 'var(--color-text-muted)' }} />
+              <input
+                value={confirmSearch}
+                onChange={e => setConfirmSearch(e.target.value)}
+                placeholder="Tìm tên khách, mã GD, phim..."
+                className="w-full pl-9 pr-8 py-2.5 rounded-xl text-xs outline-none"
+                style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text)' }}
+              />
+              {confirmSearch && (
+                <button onClick={() => setConfirmSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                  <X className="w-3.5 h-3.5" style={{ color: 'var(--color-text-muted)' }} />
+                </button>
+              )}
+            </div>
+          )}
+
+          {filteredPending.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 rounded-2xl"
               style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
               <CheckCircle className="w-10 h-10 mb-3" style={{ color: '#34D399' }} />
-              <p className="font-semibold" style={{ color: 'var(--color-text)' }}>Không có giao dịch chờ</p>
-              <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>Tự động cập nhật mỗi 6 giây</p>
+              <p className="font-semibold" style={{ color: 'var(--color-text)' }}>
+                {confirmSearch ? 'Không tìm thấy kết quả' : 'Không có giao dịch chờ'}
+              </p>
+              <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                {confirmSearch ? 'Thử từ khóa khác' : 'Tự động cập nhật mỗi 6 giây'}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
-              {pending.map((p: any) => (
-                <motion.div key={p._id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                  className="p-4 rounded-2xl"
-                  style={{
-                    background: 'var(--color-bg-2)',
-                    border: `1px solid ${p.status === 'customer_confirmed' ? 'rgba(168,85,247,0.35)' : 'var(--color-glass-border)'}`,
-                  }}>
-                  {p.status === 'customer_confirmed' && (
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--color-primary)' }} />
-                      <span className="text-xs font-bold" style={{ color: 'var(--color-primary)' }}>🔔 Khách vừa xác nhận đã chuyển</span>
+              {filteredPending.map((p: any) => {
+                const seats    = p.booking?.seatLabels?.join(', ')
+                const showtime = p.booking?.showtime
+                const theater  = showtime?.room?.theater?.name
+                const room     = showtime?.room?.name
+                const showDate = showtime?.date ? new Date(showtime.date).toLocaleDateString('vi-VN') : null
+                const showTime = showtime?.startTime
+
+                return (
+                  <motion.div key={p._id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                    className="p-4 rounded-2xl"
+                    style={{
+                      background: 'var(--color-bg-2)',
+                      border: `1px solid ${p.status === 'customer_confirmed' ? 'rgba(168,85,247,0.35)' : 'var(--color-glass-border)'}`,
+                    }}>
+                    {p.status === 'customer_confirmed' && (
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--color-primary)' }} />
+                        <span className="text-xs font-bold" style={{ color: 'var(--color-primary)' }}>🔔 Khách vừa xác nhận đã chuyển</span>
+                      </div>
+                    )}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0 space-y-1 text-xs">
+                        <div><span style={{ color: 'var(--color-text-muted)' }}>Khách: </span>
+                          <span className="font-semibold" style={{ color: 'var(--color-text)' }}>{p.user?.name}</span></div>
+                        <div><span style={{ color: 'var(--color-text-muted)' }}>Phim: </span>
+                          <span style={{ color: 'var(--color-text)' }}>{showtime?.movie?.title || 'N/A'}</span></div>
+                        <div><span style={{ color: 'var(--color-text-muted)' }}>Số tiền: </span>
+                          <span className="font-bold text-sm" style={{ color: '#FDE68A' }}>{fmtPrice(p.amount)}</span></div>
+                        <div><span style={{ color: 'var(--color-text-muted)' }}>PT: </span>
+                          <span style={{ color: 'var(--color-text-muted)' }}>
+                            {p.method === 'momo' ? '📱 MoMo' : p.method === 'vietqr' ? '🏦 VietQR' : '💳 Chuyển khoản'}
+                          </span></div>
+                        <div className="font-mono" style={{ color: 'var(--color-primary)' }}>{p.transactionId}</div>
+
+                        {/* ── Ticket info ── */}
+                        {(seats || theater || showDate) && (
+                          <div className="mt-2 p-2.5 rounded-xl grid grid-cols-1 gap-1.5"
+                            style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                            {seats && (
+                              <div className="flex items-center gap-1.5">
+                                <Armchair className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
+                                <span style={{ color: 'var(--color-text-muted)' }}>Ghế: </span>
+                                <span className="font-semibold" style={{ color: 'var(--color-text)' }}>{seats}</span>
+                              </div>
+                            )}
+                            {(showTime || showDate) && (
+                              <div className="flex items-center gap-1.5">
+                                <Clock className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
+                                <span style={{ color: 'var(--color-text-muted)' }}>Suất: </span>
+                                <span className="font-semibold" style={{ color: 'var(--color-text)' }}>
+                                  {[showTime, showDate].filter(Boolean).join(' — ')}
+                                </span>
+                              </div>
+                            )}
+                            {(theater || room) && (
+                              <div className="flex items-center gap-1.5">
+                                <MapPin className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
+                                <span style={{ color: 'var(--color-text-muted)' }}>Rạp: </span>
+                                <span className="font-semibold" style={{ color: 'var(--color-text)' }}>
+                                  {[theater, room].filter(Boolean).join(' · ')}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <button onClick={() => { setCancelModal(p); setCancelReason('') }}
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold"
+                        style={{ background: 'rgba(248,113,113,0.08)', color: '#F87171', border: '1px solid rgba(248,113,113,0.2)' }}>
+                        ⚠️ Hủy Vé
+                      </button>
                     </div>
-                  )}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0 space-y-1 text-xs">
-                      <div><span style={{ color: 'var(--color-text-muted)' }}>Khách: </span>
-                        <span className="font-semibold" style={{ color: 'var(--color-text)' }}>{p.user?.name}</span></div>
-                      <div><span style={{ color: 'var(--color-text-muted)' }}>Phim: </span>
-                        <span style={{ color: 'var(--color-text)' }}>{p.booking?.showtime?.movie?.title}</span></div>
-                      <div><span style={{ color: 'var(--color-text-muted)' }}>Số tiền: </span>
-                        <span className="font-bold text-sm" style={{ color: '#FDE68A' }}>{fmtPrice(p.amount)}</span></div>
-                      <div><span style={{ color: 'var(--color-text-muted)' }}>PT: </span>
-                        <span style={{ color: 'var(--color-text-muted)' }}>{p.method === 'bank' ? 'Chuyển khoản' : 'VietQR'}</span></div>
-                      <div className="font-mono" style={{ color: 'var(--color-primary)' }}>{p.transactionId}</div>
-                    </div>
-                    <button onClick={() => { setCancelModal(p); setCancelReason('') }}
-                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold"
-                      style={{ background: 'rgba(248,113,113,0.08)', color: '#F87171', border: '1px solid rgba(248,113,113,0.2)' }}>
-                      ⚠️ Hủy Vé
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                )
+              })}
             </div>
           )}
         </motion.div>

@@ -216,7 +216,15 @@ async function getPendingPayments(req, res) {
             .populate({
             path: 'booking',
             select: 'bookingCode seatLabels qrCode totalAmount',
-            populate: { path: 'showtime', populate: { path: 'movie', select: 'title' } }
+            populate: {
+                path: 'showtime',
+                select: 'startTime date',
+                populate: [
+                    { path: 'movie', select: 'title' },
+                    { path: 'room', select: 'name',
+                        populate: { path: 'theater', select: 'name' } }
+                ]
+            }
         })
             .populate('user', 'name email phone')
             .sort({ createdAt: -1 })

@@ -10,6 +10,6 @@ router.post('/admin-confirm', errorHandler_1.authenticate, payment_controller_1.
 router.post('/admin-reject', errorHandler_1.authenticate, payment_controller_1.adminRejectPayment);
 router.get('/pending', errorHandler_1.authenticate, payment_controller_1.getPendingPayments);
 router.get('/status/:transactionId', errorHandler_1.authenticate, payment_controller_1.getPaymentStatus);
-router.get('/by-booking/:bookingId', errorHandler_1.authenticate, payment_controller_1.getPaymentByBooking); // [MỚI] - đặt TRƯỚC /:id
+router.get('/by-booking/:bookingId', errorHandler_1.authenticate, payment_controller_1.getPaymentByBooking);
 exports.default = router;
 //# sourceMappingURL=payment.routes.js.map

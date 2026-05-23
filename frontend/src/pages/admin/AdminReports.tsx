@@ -515,7 +515,7 @@ export default function AdminReports() {
           style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
           <span className="text-sm font-semibold self-center" style={{ color: 'var(--color-text-muted)' }}>Xác nhận nhanh:</span>
           {[
-            { href: '/admin/payments', label: '💰 Xác Nhận CK' },
+            { href: '/admin/payments', label: '📋 Lịch Sử CK' },
             { href: '/staff/checkin', label: '📷 Check-in' },
             { href: '/staff/counter', label: '🎫 Bán Vé Quầy' },
             { href: '/promotions', label: '🎁 Khuyến Mãi' },

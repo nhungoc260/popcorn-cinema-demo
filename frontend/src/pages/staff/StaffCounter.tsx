@@ -21,7 +21,7 @@ const SEAT_COLORS: Record<string, { bg: string; border: string; label: string }>
 
 const TABS = [
   { id: 'sell',     label: '🎬 Bán Vé Tại Quầy', activeColor: 'var(--color-primary)' },
-  { id: 'confirm',  label: '💰 Xác Nhận CK',       activeColor: '#FDE68A' },
+  { id: 'confirm',  label: '📋 Lịch Sử CK',         activeColor: '#34D399' },
   { id: 'revenue',  label: '📊 Doanh Thu',          activeColor: '#34D399' },
   { id: 'invoices', label: '🧾 Hóa Đơn',            activeColor: '#60a5fa' },
   { id: 'support', label: '🆘 Hỗ Trợ',             activeColor: '#34D399' },
@@ -253,22 +253,17 @@ export default function StaffCounter() {
     onError: (e: any) => toast.error(e.response?.data?.message || 'Lỗi tạo đơn'),
   })
 
-  const [confirmedPayment, setConfirmedPayment] = useState<any>(null)
-
-  const { mutate: confirmCK, isPending: confirming } = useMutation({
-    mutationFn: (p: any) => api.post('/payments/admin-confirm', { paymentId: p._id }).then(res => ({ res, payment: p })),
-    onSuccess: ({ payment }) => {
-      toast.success('✅ Xác nhận thành công!')
-      setConfirmedPayment(payment)
+  const [cancelModal, setCancelModal]   = useState<any | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const { mutate: cancelFraud, isPending: cancelling } = useMutation({
+    mutationFn: ({ paymentId, reason }: { paymentId: string; reason: string }) =>
+      api.post('/payments/admin-reject', { paymentId, reason }),
+    onSuccess: () => {
+      toast.success('❌ Đã hủy vé và hoàn ghế')
+      setCancelModal(null); setCancelReason('')
       qc.invalidateQueries({ queryKey: ['staff-pending'] })
-      qc.invalidateQueries({ queryKey: ['staff-seats', selShowtime?._id] })
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Lỗi'),
-  })
-
-  const { mutate: rejectCK } = useMutation({
-    mutationFn: (paymentId: string) => api.post('/payments/admin-reject', { paymentId, reason: 'Staff từ chối' }),
-    onSuccess: () => { toast.success('Đã từ chối'); qc.invalidateQueries({ queryKey: ['staff-pending'] }) },
   })
 
   const resetSell = () => {
@@ -276,7 +271,6 @@ export default function StaffCounter() {
     setStep('movie'); setPayMethod('cash'); setDoneBooking(null)
     setCouponCode(''); setCouponData(null); setQrData(null); setTxnId(null); setPayStep('form')
     setCustomerQuery(''); setCustomerResult(null); setCustomerLoyalty(null); setPointsDiscount(0)
-    setConfirmedPayment(null)
   }
 
   // Fill đủ 14 ngày gần nhất, ngày không có data = 0
@@ -319,7 +313,7 @@ export default function StaffCounter() {
             {t.label}
             {t.id === 'confirm' && pending.length > 0 && (
               <span className="px-1.5 py-0.5 rounded-full text-xs font-black"
-                style={{ background: '#F87171', color: 'white', minWidth: 18, textAlign: 'center' }}>
+                style={{ background: '#34D399', color: 'white', minWidth: 18, textAlign: 'center' }}>
                 {pending.length}
               </span>
             )}
@@ -922,10 +916,10 @@ export default function StaffCounter() {
                     </div>
                   )}
                   {payMethod !== 'cash' && (
-                    <div className="p-3 rounded-xl flex gap-2" style={{ background: 'rgba(253,230,138,0.07)', border: '1px solid rgba(253,230,138,0.2)' }}>
-                      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#FDE68A' }} />
+                    <div className="p-3 rounded-xl flex gap-2" style={{ background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                      <span className="flex-shrink-0 mt-0.5">⚡</span>
                       <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                        Tạo đơn → Hiện QR cho khách quét → Xác nhận trong tab <b style={{ color: '#FDE68A' }}>"Xác Nhận CK"</b>
+                        Tạo đơn → Cho khách quét QR → Bấm <b style={{ color: '#34D399' }}>"Khách đã quét xong"</b> → Vé xác nhận <b style={{ color: '#34D399' }}>ngay lập tức</b>
                       </p>
                     </div>
                   )}
@@ -979,13 +973,15 @@ export default function StaffCounter() {
                       style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text-muted)' }}>
                       ← Quay lại
                     </button>
-                    <button onClick={() => { setStep('done') }}
-                      className="flex-1 py-3 rounded-xl text-sm font-bold"
-                      style={{ background: 'linear-gradient(135deg,#FDE68A,#F59E0B)', color: '#1a1a1a' }}>
-                      ✅ Khách đã quét xong
+                    <button onClick={async () => {
+                      try { await api.post('/payments/confirm', { transactionId: txnId }) } catch {}
+                      setStep('done')
+                    }}
+                    style={{ background: 'linear-gradient(135deg,var(--color-primary),var(--color-primary-dark))', color: 'white' }}>
+                    ✅ Khách đã quét xong
                     </button>
                   </div>
-                  <p className="text-xs" style={{ color: 'var(--color-text-dim)' }}>Sau khi khách quét, vào tab Xác Nhận CK để duyệt</p>
+                  <p className="text-xs" style={{ color: 'var(--color-text-dim)' }}>Vé sẽ được xác nhận ngay sau khi bấm</p>
                 </div>
                 )}
               </div>
@@ -1002,9 +998,9 @@ export default function StaffCounter() {
                 {doneBooking.requiresConfirm ? 'Chờ khách chuyển khoản' : 'Bán vé thành công!'}
               </h3>
               {doneBooking.requiresConfirm && (
-                <p className="text-sm mb-4" style={{ color: 'var(--color-text-muted)' }}>
-                  Sau khi khách chuyển xong, chuyển qua tab <span style={{ color: '#FDE68A' }}>Xác Nhận CK</span>
-                </p>
+                <button onClick={() => { resetSell(); setTab('confirm') }}>
+                  💰 Xác nhận CK
+                </button>
               )}
               <div className="p-4 rounded-xl mb-4 text-left" style={{ background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.2)' }}>
                 <div className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>Mã vé</div>
@@ -1133,18 +1129,11 @@ export default function StaffCounter() {
                         <span style={{ color: 'var(--color-text-muted)' }}>{p.method === 'bank' ? 'Chuyển khoản' : 'VietQR'}</span></div>
                       <div className="font-mono" style={{ color: 'var(--color-primary)' }}>{p.transactionId}</div>
                     </div>
-                    <div className="flex flex-col gap-2 flex-shrink-0">
-                      <button onClick={() => confirmCK(p)} disabled={confirming}
-                        className="px-3 py-2 rounded-xl text-xs font-bold disabled:opacity-50 flex items-center gap-1.5"
-                        style={{ background: 'linear-gradient(135deg,var(--color-primary),var(--color-primary-dark))', color: 'white', boxShadow: '0 2px 8px rgba(168,85,247,0.3)' }}>
-                        <CheckCircle className="w-3.5 h-3.5" /> Xác nhận
-                      </button>
-                      <button onClick={() => rejectCK(p._id)}
-                        className="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"
-                        style={{ background: 'rgba(248,113,113,0.1)', color: '#F87171', border: '1px solid rgba(248,113,113,0.3)' }}>
-                        ✕ Từ chối
-                      </button>
-                    </div>
+                    <button onClick={() => { setCancelModal(p); setCancelReason('') }}
+                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold"
+                      style={{ background: 'rgba(248,113,113,0.08)', color: '#F87171', border: '1px solid rgba(248,113,113,0.2)' }}>
+                      ⚠️ Hủy Vé
+                    </button>
                   </div>
                 </motion.div>
               ))}
@@ -1256,70 +1245,40 @@ export default function StaffCounter() {
           }}
         />
       )}
-      {/* ── Modal QR sau khi xác nhận CK ── */}
-      {confirmedPayment && (
+      {cancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)' }}>
+          style={{ background: 'rgba(0,0,0,0.75)' }}>
           <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-            className="w-full max-w-sm rounded-2xl overflow-hidden text-center p-6"
-            style={{ background: 'var(--color-bg-2)', border: '1px solid var(--color-glass-border)' }}>
-            <div className="text-4xl mb-2">🎉</div>
-            <h3 className="font-black text-lg mb-1" style={{ color: 'var(--color-text)' }}>Thanh toán xác nhận!</h3>
-            <p className="text-xs mb-4" style={{ color: 'var(--color-text-muted)' }}>Cho khách quét QR này để vào rạp</p>
-
-            {/* QR từ booking */}
-            {confirmedPayment.booking?.qrCode ? (
-              <div className="flex justify-center mb-4">
-                <img src={confirmedPayment.booking.qrCode} alt="QR vé"
-                  className="w-48 h-48 rounded-xl" style={{ background: 'white', padding: 8 }} />
-              </div>
-            ) : (
-              <div className="mb-4 p-4 rounded-xl" style={{ background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.2)' }}>
-                <div className="font-mono font-black text-xl" style={{ color: 'var(--color-primary)' }}>
-                  {confirmedPayment.booking?.bookingCode}
-                </div>
-              </div>
-            )}
-
-            <div className="text-sm mb-4" style={{ color: 'var(--color-text-muted)' }}>
-              Ghế: <span style={{ color: 'var(--color-primary)', fontWeight: 700 }}>
-                {confirmedPayment.booking?.seatLabels?.join(', ')}
-              </span>
+            className="w-full max-w-sm p-5 rounded-3xl"
+            style={{ background: 'var(--color-bg-2)', border: '1px solid rgba(248,113,113,0.3)' }}>
+            <h3 className="font-bold text-base mb-1" style={{ color: 'var(--color-text)' }}>Hủy vé gian lận</h3>
+            <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>{cancelModal.transactionId}</p>
+            <div className="flex gap-1.5 flex-wrap mb-2">
+              {['Không tìm thấy GD', 'Sai nội dung CK', 'Số tiền không khớp', 'Gian lận'].map(r => (
+                <button key={r} onClick={() => setCancelReason(r)}
+                  className="px-2 py-1 rounded-lg text-xs"
+                  style={{
+                    background: cancelReason === r ? 'rgba(248,113,113,0.15)' : 'var(--color-bg-3)',
+                    color: cancelReason === r ? '#F87171' : 'var(--color-text-muted)',
+                    border: `1px solid ${cancelReason === r ? 'rgba(248,113,113,0.4)' : 'var(--color-glass-border)'}`,
+                  }}>{r}</button>
+              ))}
             </div>
-
+            <textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)}
+              rows={2} placeholder="Hoặc nhập lý do..."
+              className="w-full p-2.5 rounded-xl text-xs outline-none resize-none mb-3"
+              style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text)' }} />
             <div className="flex gap-2">
-              {confirmedPayment.booking?.qrCode && (
-                <button
-                  onClick={() => {
-                    const win = window.open('', '_blank')
-                    if (!win) return
-                    win.document.write(`
-                      <html><head><title>Vé - ${confirmedPayment.booking?.bookingCode}</title>
-                      <style>
-                        body { font-family: sans-serif; text-align: center; padding: 20px; }
-                        h2 { color: #7c3aed; } img { width: 200px; height: 200px; }
-                        .code { font-family: monospace; font-size: 20px; font-weight: bold; color: #7c3aed; }
-                        .info { margin: 8px 0; font-size: 14px; }
-                      </style></head>
-                      <body onload="window.print()">
-                        <h2>🎬 POPCORN CINEMA</h2>
-                        <img src="${confirmedPayment.booking?.qrCode}" />
-                        <div class="code">${confirmedPayment.booking?.bookingCode}</div>
-                        <div class="info">Ghế: <b>${confirmedPayment.booking?.seatLabels?.join(', ')}</b></div>
-                        <div class="info" style="color:#888;font-size:12px">Xuất trình mã này khi vào rạp</div>
-                      </body></html>
-                    `)
-                    win.document.close()
-                  }}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold"
-                  style={{ background: 'rgba(52,211,153,0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }}>
-                  🖨️ In vé
-                </button>
-              )}
-              <button onClick={() => setConfirmedPayment(null)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold"
-                style={{ background: 'linear-gradient(135deg,var(--color-primary),var(--color-primary-dark))', color: 'white' }}>
-                ✓ Xong
+              <button onClick={() => { setCancelModal(null); setCancelReason('') }}
+                className="flex-1 py-2.5 rounded-xl text-xs font-medium"
+                style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text-muted)' }}>
+                Thôi
+              </button>
+              <button onClick={() => cancelFraud({ paymentId: cancelModal._id, reason: cancelReason || 'Staff hủy' })}
+                disabled={cancelling || !cancelReason.trim()}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50"
+                style={{ background: 'rgba(248,113,113,0.15)', color: '#F87171', border: '1px solid rgba(248,113,113,0.3)' }}>
+                {cancelling ? 'Đang hủy...' : '❌ Xác nhận Hủy'}
               </button>
             </div>
           </motion.div>

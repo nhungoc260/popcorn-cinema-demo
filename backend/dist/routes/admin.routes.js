@@ -348,7 +348,22 @@ router.post('/showtimes/auto-generate', async (req, res) => {
         }
         const start = new Date(startDate);
         const end = new Date(endDate);
-        const sessionSlots = [];
+        const endOfRange = new Date(end);
+        endOfRange.setDate(endOfRange.getDate() + 1);
+        const existingShowtimes = await models_1.Showtime.find({
+            theater: theaterId,
+            isActive: true,
+            startTime: { $lt: endOfRange },
+            endTime: { $gt: start },
+        }).select('room startTime endTime').lean();
+        const bookedSlots = existingShowtimes.map(s => ({
+            roomId: s.room.toString(),
+            startTime: new Date(s.startTime),
+            endTime: new Date(s.endTime),
+        }));
+        function isConflict(roomId, s, e) {
+            return bookedSlots.some(b => b.roomId === roomId && s < b.endTime && e > b.startTime);
+        }
         const generatedByMovie = {};
         ids.forEach(id => { generatedByMovie[id] = 0; });
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -370,15 +385,8 @@ router.post('/showtimes/auto-generate', async (req, res) => {
                 startTime.setHours(hours, minutes, 0, 0);
                 const endTime = new Date(startTime.getTime() + (duration + 15) * 60000);
                 for (const room of rooms) {
-                    const dbConflict = await models_1.Showtime.findOne({
-                        room: room._id, isActive: true,
-                        startTime: { $lt: endTime }, endTime: { $gt: startTime },
-                    });
-                    if (dbConflict)
-                        continue;
-                    const sessionConflict = sessionSlots.some(slot => slot.roomId === room._id.toString() &&
-                        hasOverlap(startTime, endTime, slot.startTime, slot.endTime));
-                    if (sessionConflict)
+                    const roomId = room._id.toString();
+                    if (isConflict(roomId, startTime, endTime))
                         continue;
                     await models_1.Showtime.create({
                         movie: mId, room: room._id, theater: theaterId,
@@ -386,7 +394,7 @@ router.post('/showtimes/auto-generate', async (req, res) => {
                         priceStandard, priceVip, priceDouble, priceRecliner,
                         basePrice: priceStandard, isActive: true,
                     });
-                    sessionSlots.push({ roomId: room._id.toString(), startTime, endTime });
+                    bookedSlots.push({ roomId, startTime, endTime });
                     generatedByMovie[mId]++;
                     break;
                 }

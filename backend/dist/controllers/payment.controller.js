@@ -134,16 +134,22 @@ async function initiatePayment(req, res) {
         return res.status(500).json({ success: false, message: err.message });
     }
 }
-// POST /payments/confirm
+/// POST /payments/confirm
 async function confirmPayment(req, res) {
     try {
         const { transactionId } = req.body;
         const payment = await models_1.Payment.findOne({ transactionId });
         if (!payment)
             return res.status(404).json({ success: false, message: 'Payment not found' });
-        payment.status = 'customer_confirmed';
-        await payment.save();
-        return res.json({ success: true, requiresAdminConfirm: true, message: 'Đã ghi nhận! Nhân viên sẽ xác nhận trong vài phút.' });
+        if (payment.status === 'success') {
+            return res.status(400).json({ success: false, message: 'Đã xác nhận rồi' });
+        }
+        await doConfirmPayment(payment);
+        return res.json({
+            success: true,
+            requiresAdminConfirm: false, // ← đổi thành false
+            message: '✅ Thanh toán xác nhận thành công!'
+        });
     }
     catch (err) {
         return res.status(500).json({ success: false, message: err.message });

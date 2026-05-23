@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { CheckCircle, Clock, AlertCircle, RefreshCw, Coins, Tag, X } from 'lucide-react'
+import { CheckCircle, Clock, Coins, Tag, X } from 'lucide-react'
 import api, { bookingApi, paymentApi } from '../api'
 import BookingSteps from '../components/booking/BookingSteps'
 import toast from 'react-hot-toast'
@@ -11,9 +11,9 @@ const REAL_VIETQR = '/vietqr.jpg'
 const MOMO_QR = '/momo-qr.png'
 
 const METHODS = [
-  { id: 'momo',   label: 'MoMo',         icon: '📱', desc: 'Quét QR MoMo',        color: '#AE2070', selfConfirm: false },
-  { id: 'vietqr', label: 'VietQR',        icon: '🏦', desc: 'Quét QR ngân hàng',   color: 'var(--color-primary)', selfConfirm: false },
-  { id: 'bank',   label: 'Chuyển khoản', icon: '💳', desc: 'Vietcombank / BIDV',  color: '#FDE68A', selfConfirm: false },
+  { id: 'momo',   label: 'MoMo',         icon: '📱', desc: 'Quét QR MoMo',       color: '#AE2070' },
+  { id: 'vietqr', label: 'VietQR',        icon: '🏦', desc: 'Quét QR ngân hàng',  color: 'var(--color-primary)' },
+  { id: 'bank',   label: 'Chuyển khoản', icon: '💳', desc: 'Vietcombank / BIDV', color: '#FDE68A' },
 ]
 
 const fmtPrice = (n: number) => n.toLocaleString('vi-VN') + 'đ'
@@ -28,10 +28,8 @@ export default function PaymentPage() {
   const [method, setMethod] = useState('momo')
   const [qrData, setQrData] = useState<string | null>(null)
   const [txnId, setTxnId] = useState<string | null>(null)
-  const [requiresConfirmation, setRequiresConfirmation] = useState(false)
-  const [step, setStep] = useState<'choose' | 'qr' | 'waiting' | 'done'>('choose')
+  const [step, setStep] = useState<'choose' | 'qr' | 'done'>('choose')
   const [initiated, setInitiated] = useState(false)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Loyalty states
   const [usePoints, setUsePoints] = useState(false)
@@ -39,7 +37,7 @@ export default function PaymentPage() {
   const [discount, setDiscount] = useState<any>(null)
   const [loadingDiscount, setLoadingDiscount] = useState(false)
 
-  // 🆕 Coupon states
+  // Coupon states
   const [couponCode, setCouponCode] = useState('')
   const [couponResult, setCouponResult] = useState<any>(null)
   const [loadingCoupon, setLoadingCoupon] = useState(false)
@@ -60,7 +58,7 @@ export default function PaymentPage() {
   const loyalty = loyaltyData as any
   const currentMethod = METHODS.find(m => m.id === method)!
 
-  // 🆕 Tính finalAmount có tính cả coupon
+  // Tính finalAmount có tính cả coupon
   const finalAmount = useMemo(() => {
     let base = booking?.totalAmount ?? 0
     if (discount) base = discount.finalAmount
@@ -68,34 +66,13 @@ export default function PaymentPage() {
     return base
   }, [booking?.totalAmount, discount, couponResult])
 
-  // ✅ Tính số điểm tối đa có thể dùng (30% giá trị đơn)
+  // Tính số điểm tối đa có thể dùng (30% giá trị đơn)
   const maxPointsAllowed = useMemo(() => {
     if (!booking?.totalAmount || !loyalty?.points) return 0
     const maxDiscount = Math.floor(booking.totalAmount * 0.3)
     const maxByPercent = Math.floor(maxDiscount / 10000 * 100)
     return Math.min(maxByPercent, loyalty.points)
   }, [booking?.totalAmount, loyalty?.points])
-
-  useEffect(() => {
-    if (step === 'waiting' && txnId) {
-      pollRef.current = setInterval(async () => {
-        try {
-          const { data } = await api.get(`/payments/status/${txnId}`)
-          if (data.data.status === 'success') {
-            clearInterval(pollRef.current!)
-            setStep('done')
-            setTimeout(() => navigate(`/booking-success/${bookingId}`), 1500)
-          } else if (data.data.status === 'failed') {
-            clearInterval(pollRef.current!)
-            toast.error('Thanh toán bị từ chối. Vui lòng thử lại.')
-            setStep('choose')
-            setInitiated(false)
-          }
-        } catch {}
-      }, 5000)
-    }
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [step, txnId])
 
   const handleApplyPoints = async () => {
     if (!bookingId || pointsToUse <= 0) return
@@ -120,7 +97,7 @@ export default function PaymentPage() {
     }
   }
 
-  // 🆕 Áp mã coupon
+  // Áp mã coupon
   const handleApplyCoupon = async () => {
     if (!couponCode.trim() || !bookingId) return
     setLoadingCoupon(true)
@@ -140,42 +117,37 @@ export default function PaymentPage() {
     }
   }
 
-  // 🆕 Xóa mã coupon
+  // Xóa mã coupon
   const handleRemoveCoupon = () => {
     setCouponResult(null)
     setCouponCode('')
   }
 
   const { mutate: initiate, isPending: initiating } = useMutation({
-      mutationFn: () => paymentApi.initiate(
-        bookingId!, 
-        method, 
-        finalAmount, 
-        discount?.actualPointsUsed || 0,
-        couponResult?.code || undefined
-      ),
-      onSuccess: ({ data }) => {
+    mutationFn: () => paymentApi.initiate(
+      bookingId!,
+      method,
+      finalAmount,
+      discount?.actualPointsUsed || 0,
+      couponResult?.code || undefined
+    ),
+    onSuccess: ({ data }) => {
       setQrData(data.data.qrData)
       setTxnId(data.data.transactionId)
-      setRequiresConfirmation(data.data.requiresConfirmation || false)
       setInitiated(true)
       setStep('qr')
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Không thể khởi tạo thanh toán'),
   })
 
+  // ✅ Tự động confirm, không cần admin duyệt
   const { mutate: notifyTransferred, isPending: notifying } = useMutation({
     mutationFn: () => paymentApi.confirm(txnId!),
-    onSuccess: ({ data }: any) => {
-      if (data.requiresAdminConfirm) {
-        setStep('waiting')
-        toast.success('✅ Đã ghi nhận! Chờ admin/nhân viên xác nhận...')
-      } else {
-        setStep('done')
-        setTimeout(() => navigate(`/booking-success/${bookingId}`), 1500)
-      }
+    onSuccess: () => {
+      setStep('done')
+      setTimeout(() => navigate(`/booking-success/${bookingId}`), 1500)
     },
-    onError: () => toast.error('Lỗi xác nhận'),
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Lỗi xác nhận thanh toán'),
   })
 
   const { mutate: cancelBooking, isPending: cancelling } = useMutation({
@@ -294,7 +266,7 @@ export default function PaymentPage() {
                 </div>
               )}
 
-              {/* 🆕 COUPON SECTION */}
+              {/* COUPON SECTION */}
               {step === 'choose' && (
                 <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--color-glass-border)' }}>
                   <div className="flex items-center gap-2 mb-2">
@@ -303,7 +275,6 @@ export default function PaymentPage() {
                   </div>
 
                   {couponResult ? (
-                    // Đã áp mã thành công
                     <div className="flex items-center justify-between p-3 rounded-xl"
                       style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)' }}>
                       <div className="flex items-center gap-2">
@@ -323,7 +294,6 @@ export default function PaymentPage() {
                       </button>
                     </div>
                   ) : (
-                    // Chưa áp mã
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -376,6 +346,8 @@ export default function PaymentPage() {
           )}
 
           <AnimatePresence mode="wait">
+
+            {/* ── STEP: CHOOSE ── */}
             {step === 'choose' && (
               <motion.div key="choose" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <p className="text-sm mb-3 font-medium" style={{ color: 'var(--color-text-muted)' }}>Chọn phương thức thanh toán</p>
@@ -390,11 +362,6 @@ export default function PaymentPage() {
                         <div className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>{m.label}</div>
                         <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{m.desc}</div>
                       </div>
-                      {!m.selfConfirm && (
-                        <span className="text-xs px-2 py-1 rounded-full flex-shrink-0" style={{ background: 'rgba(253,230,138,0.1)', color: '#FDE68A', border: '1px solid rgba(253,230,138,0.2)' }}>
-                          Chờ xác nhận
-                        </span>
-                      )}
                       {method === m.id && (
                         <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: m.color }}>
                           <CheckCircle className="w-3 h-3 text-white" />
@@ -404,14 +371,13 @@ export default function PaymentPage() {
                   ))}
                 </div>
 
-                {!currentMethod.selfConfirm && (
-                  <div className="mb-4 p-3 rounded-xl flex gap-2" style={{ background: 'rgba(253,230,138,0.08)', border: '1px solid rgba(253,230,138,0.2)' }}>
-                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#FDE68A' }}/>
-                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      Chuyển khoản xong → Bấm <b style={{ color: '#FDE68A' }}>"Đã Chuyển Tiền"</b> → Chờ admin/nhân viên xác nhận (5-15 phút)
-                    </p>
-                  </div>
-                )}
+                {/* ✅ Thông báo tự động xác nhận */}
+                <div className="mb-4 p-3 rounded-xl flex gap-2" style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                  <span className="text-base flex-shrink-0">⚡</span>
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                    Chuyển khoản xong → Bấm <b style={{ color: '#34D399' }}>"Đã Thanh Toán"</b> → Vé được xác nhận <b style={{ color: '#34D399' }}>ngay lập tức</b>, không cần chờ duyệt.
+                  </p>
+                </div>
 
                 <div className="flex gap-3">
                   <button
@@ -433,6 +399,7 @@ export default function PaymentPage() {
               </motion.div>
             )}
 
+            {/* ── STEP: QR ── */}
             {step === 'qr' && qrData && (
               <motion.div key="qr" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-5" style={{ color: '#FDE68A' }}>
@@ -488,6 +455,14 @@ export default function PaymentPage() {
                   Mã GD: <span className="font-mono font-bold" style={{ color: 'var(--color-primary)' }}>{txnId}</span>
                 </div>
 
+                {/* ✅ Banner tự động xác nhận */}
+                <div className="mb-4 p-3 rounded-xl flex gap-2" style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                  <span className="text-base flex-shrink-0">⚡</span>
+                  <p className="text-xs text-left" style={{ color: 'var(--color-text-muted)' }}>
+                    Sau khi chuyển tiền xong, bấm <b style={{ color: '#34D399' }}>"Đã Thanh Toán"</b> — vé sẽ được xác nhận <b style={{ color: '#34D399' }}>ngay lập tức</b>.
+                  </p>
+                </div>
+
                 <div className="flex gap-3">
                   <button onClick={() => { setStep('choose'); setInitiated(false); setQrData(null) }}
                     className="flex-1 py-3 rounded-xl text-sm font-medium"
@@ -498,60 +473,16 @@ export default function PaymentPage() {
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     className="flex-1 py-3 rounded-xl text-sm font-bold disabled:opacity-60"
                     style={{
-                      background: requiresConfirmation ? 'linear-gradient(135deg, #FDE68A, #F59E0B)' : 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))',
+                      background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))',
                       color: 'white'
                     }}>
-                    {notifying ? '⏳ Đang xử lý...' : '✅ Đã Thanh Toán — Chờ Xác Nhận'}
+                    {notifying ? '⏳ Đang xử lý...' : '✅ Đã Thanh Toán'}
                   </motion.button>
                 </div>
-
-                {requiresConfirmation && (
-                  <p className="text-xs mt-3" style={{ color: 'var(--color-text-dim)' }}>
-                    Admin/Nhân viên sẽ xác nhận trong 5-15 phút
-                  </p>
-                )}
               </motion.div>
             )}
 
-            {step === 'waiting' && (
-              <motion.div key="waiting" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-4">
-                <motion.div className="w-20 h-20 rounded-full border-4 mx-auto mb-5 flex items-center justify-center"
-                  style={{ borderColor: 'rgba(168,85,247,0.3)', borderTopColor: 'var(--color-primary)' }}
-                  animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}>
-                  <RefreshCw className="w-7 h-7" style={{ color: 'var(--color-primary)' }}/>
-                </motion.div>
-                <h3 className="font-bold text-xl mb-2" style={{ color: 'var(--color-text)' }}>⏳ Đang Chờ Xác Nhận</h3>
-                <p className="text-sm mb-5" style={{ color: 'var(--color-text-muted)' }}>Admin/Nhân viên đang kiểm tra giao dịch</p>
-
-                <div className="p-5 rounded-2xl mb-5 text-left" style={{ background: 'var(--color-bg-3)', border: '1px solid var(--color-glass-border)' }}>
-                  <div className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>Mã giao dịch</div>
-                  <div className="font-mono font-bold" style={{ color: 'var(--color-primary)' }}>{txnId}</div>
-                  <div className="mt-3 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"/>
-                    <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Thời gian xử lý: <span style={{ color: '#FDE68A' }}>5 - 15 phút</span></span>
-                  </div>
-                </div>
-
-                <div className="space-y-3 text-left mb-5">
-                  {[
-                    { label: 'Khách chuyển khoản', done: true },
-                    { label: 'Hệ thống ghi nhận', done: true },
-                    { label: 'Admin/Staff xác nhận', done: false, active: true },
-                    { label: 'Vé được xác nhận', done: false },
-                  ].map((s, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                        style={{ background: s.done ? 'var(--color-primary)' : s.active ? 'rgba(253,230,138,0.2)' : 'var(--color-bg-3)', border: s.active ? '2px solid #FDE68A' : 'none', color: s.done ? 'var(--color-bg)' : s.active ? '#FDE68A' : 'var(--color-text-dim)' }}>
-                        {s.done ? '✓' : i + 1}
-                      </div>
-                      <span className="text-sm" style={{ color: s.done ? 'var(--color-text)' : s.active ? '#FDE68A' : 'var(--color-text-dim)' }}>{s.label}</span>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs" style={{ color: 'var(--color-text-dim)' }}>Trang tự động cập nhật • Có thể đóng và quay lại sau</p>
-              </motion.div>
-            )}
-
+            {/* ── STEP: DONE ── */}
             {step === 'done' && (
               <motion.div key="done" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8">
                 <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.5 }} className="text-6xl mb-4">🎉</motion.div>
@@ -559,6 +490,7 @@ export default function PaymentPage() {
                 <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Đang chuyển đến trang vé...</p>
               </motion.div>
             )}
+
           </AnimatePresence>
         </motion.div>
       </div>

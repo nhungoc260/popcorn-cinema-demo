@@ -7,7 +7,7 @@ import {
   adminRejectPayment,
   getPendingPayments,
   getPaymentStatus,
-  getPaymentByBooking, // [MỚI]
+  getPaymentByBooking,
 } from '../controllers/payment.controller';
 
 const router = Router();
@@ -18,6 +18,6 @@ router.post('/admin-confirm', authenticate, adminConfirmPayment);
 router.post('/admin-reject', authenticate, adminRejectPayment);
 router.get('/pending', authenticate, getPendingPayments);
 router.get('/status/:transactionId', authenticate, getPaymentStatus);
-router.get('/by-booking/:bookingId', authenticate, getPaymentByBooking); // [MỚI] - đặt TRƯỚC /:id
+router.get('/by-booking/:bookingId', authenticate, getPaymentByBooking);
 
 export default router;

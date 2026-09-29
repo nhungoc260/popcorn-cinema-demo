@@ -83,68 +83,6 @@ popcorn-cinema/
 
 ---
 
-## 🚀 Hướng Dẫn Cài Đặt & Chạy
-
-### Bước 1 – Clone repository
-
-```bash
-git clone https://github.com/nhungoc260/popcorn-cinema-demo.git
-cd popcorn-cinema-demo
-```
-
-### Bước 2 – Khởi động MongoDB & Redis
-
-```bash
-# MongoDB (Windows Service)
-net start MongoDB
-
-# Redis (Windows)
-redis-server
-
-# macOS/Linux
-brew services start mongodb-community
-brew services start redis
-```
-
-### Bước 3 – Setup Backend
-
-```bash
-cd backend
-npm install
-cp .env.example .env    # Cấu hình biến môi trường
-npm run seed            # Seed dữ liệu mẫu vào database
-npm run dev             # Chạy backend tại port 5000
-```
-
-### Bước 4 – Setup Frontend
-
-```bash
-cd frontend
-npm install
-cp .env.example .env    # Cấu hình VITE_API_URL, VITE_GOOGLE_CLIENT_ID
-npm run dev             # Chạy frontend tại port 5173
-```
-
-### Bước 5 – Mở trình duyệt
-
-```
-🌐 Frontend:    http://localhost:5173
-📡 Backend API: http://localhost:5000/api
-🏥 Health:      http://localhost:5000/health
-```
-
----
-
-## 👤 Tài Khoản Demo
-
-| Role | Email | Mật khẩu | Trang sau đăng nhập |
-|------|-------|----------|---------------------|
-| 🔑 Admin | ngocadmin@gmail.vn | admin123 | /admin (Dashboard) |
-| 🧑‍💼 Nhân viên | ngocstaff@gmail.com | staff123 | /staff/counter (Quầy vé) |
-| 👤 Khách hàng | ngocuser@gmail.com | user123 | / (Trang chủ) |
-
----
-
 ## 🎛 Tính Năng Theo Role
 
 ### 🔑 Admin (`/admin`)
@@ -308,48 +246,6 @@ Hết 5 phút không thanh toán:
 | AI | Groq SDK (AI Chat Widget) |
 | Deploy | Render (Backend) + Vercel (Frontend) |
 | Monitoring | UptimeRobot (keep-alive ping) |
-
----
-
-## 🔧 Troubleshooting
-
-**Lỗi kết nối MongoDB:**
-```bash
-mongosh --eval "db.adminCommand('ping')"
-```
-
-**Lỗi Redis:**
-```bash
-redis-cli ping   # Kết quả mong đợi: PONG
-```
-
-**Port conflict:**
-```bash
-# Đổi PORT trong backend/.env
-PORT=5001
-```
-
-**Frontend không gọi được API:**
-```
-# Kiểm tra frontend/.env
-VITE_API_URL=http://localhost:5000/api
-
-# Kiểm tra vite.config.ts proxy
-proxy: { '/api': { target: 'http://localhost:5000' } }
-```
-
----
-
-## 📦 Build Production
-
-```bash
-# Backend
-cd backend && npm run build && npm start
-
-# Frontend
-cd frontend && npm run build
-# Output: frontend/dist/ → deploy lên Nginx / Vercel
-```
 
 ---
 
